@@ -1,0 +1,178 @@
+[
+  {
+    "id": 1,
+    "name": "Equipo de cómputo"
+  },
+  {
+    "id": 2,
+    "name": "Banco de altura"
+  },
+  {
+    "id": 3,
+    "name": "Banco giratorio"
+  },
+  {
+    "id": 4,
+    "name": "Báscula electrónica  con estadímetro"
+  },
+  {
+    "id": 5,
+    "name": "Báscula pesabebés electrónica"
+  },
+  {
+    "id": 6,
+    "name": "Mesa para colocar báscula pesabebés"
+  },
+  {
+    "id": 7,
+    "name": "Bote sanitario con pedal"
+  },
+  {
+    "id": 8,
+    "name": "Caja portalaminilla de plástico con separadores"
+  },
+  {
+    "id": 9,
+    "name": "Carta Snellen con marco"
+  },
+  {
+    "id": 10,
+    "name": "Charola de Mayo de acero inoxidable"
+  },
+  {
+    "id": 11,
+    "name": "Cinta métrica"
+  },
+  {
+    "id": 12,
+    "name": "Contenedor de jabón líquido"
+  },
+  {
+    "id": 13,
+    "name": "Contenedor de toallas desechables"
+  },
+  {
+    "id": 14,
+    "name": "Contenedor rígido para RPBI"
+  },
+  {
+    "id": 15,
+    "name": "Cubeta de acero inoxidable y bolsa"
+  },
+  {
+    "id": 16,
+    "name": "Escritorio médico"
+  },
+  {
+    "id": 17,
+    "name": "Esfigmomanómetro"
+  },
+  {
+    "id": 18,
+    "name": "Espejo vestidor"
+  },
+  {
+    "id": 19,
+    "name": "Espejos vaginales"
+  },
+  {
+    "id": 20,
+    "name": "Estadímetro pediátrico"
+  },
+  {
+    "id": 21,
+    "name": "Estetoscopio cápsula doble"
+  },
+  {
+    "id": 22,
+    "name": "Estetoscopio Pinard o doppler fetal portátil"
+  },
+  {
+    "id": 23,
+    "name": "Guarda de medicamentos, materiales o instrumental"
+  },
+  {
+    "id": 24,
+    "name": "Guardarropa con perchero"
+  },
+  {
+    "id": 25,
+    "name": "Lámpara de examinación  de pie rodable"
+  },
+  {
+    "id": 26,
+    "name": "Lavabo"
+  },
+  {
+    "id": 27,
+    "name": "Martillo percusor"
+  },
+  {
+    "id": 28,
+    "name": "Mesa de Mayo de acero inoxidable"
+  },
+  {
+    "id": 29,
+    "name": "Mesa Pasteur"
+  },
+  {
+    "id": 30,
+    "name": "Mesa universal para Exploración"
+  },
+  {
+    "id": 31,
+    "name": "Otoscopio"
+  },
+  {
+    "id": 32,
+    "name": "Oximetro de pulso"
+  },
+  {
+    "id": 33,
+    "name": "Porta cubeta rodable con protector de hule"
+  },
+  {
+    "id": 34,
+    "name": "Porta rollo para papel Kraft o sábanas"
+  },
+  {
+    "id": 35,
+    "name": "Silla para el paciente"
+  },
+  {
+    "id": 36,
+    "name": "Silla para el acompañante"
+  },
+  {
+    "id": 37,
+    "name": "Sillón giratorio de respaldo bajo"
+  },
+  {
+    "id": 38,
+    "name": "Termo congelante integrado para transporte y conservación de vacunas"
+  },
+  {
+    "id": 39,
+    "name": "Paquetes refrigerantes para termo"
+  },
+  {
+    "id": 40,
+    "name": "Termómetro de vástago"
+  },
+  {
+    "id": 41,
+    "name": "Termómetro digital"
+  },
+  {
+    "id": 42,
+    "name": "Tijera recta"
+  },
+  {
+    "id": 43,
+    "name": "Torundera con tapa de acero Inoxidable"
+  },
+  {
+    "id": 44,
+    "name": "Vaso contenedor  de vacunas"
+  }
+]

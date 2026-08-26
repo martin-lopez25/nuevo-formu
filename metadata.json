@@ -1,0 +1,6 @@
+{
+  "name": "Cuestionario de Equipamiento por Unidad Médica",
+  "description": "Sistema integral de registro, captura y sincronización de equipamiento por unidad médica para IMSS-BIENESTAR con soporte offline, parallax y validación en tiempo real.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
