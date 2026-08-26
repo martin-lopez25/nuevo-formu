@@ -11,6 +11,9 @@ function pagesIndexPlugin() {
 
   return {
     name: 'pages-index',
+    buildStart() {
+      fs.rmSync(path.resolve(__dirname, 'pages-assets'), { recursive: true, force: true });
+    },
     closeBundle() {
       const compiledHtml = fs.readFileSync(sourcePath, 'utf8');
       fs.writeFileSync(outputPath, compiledHtml);

@@ -1,6 +1,7 @@
 import { MexicanEntity, MedicalUnit, QuestionAnswer, EquipmentItem, SyncQueueItem, UnitGeneralData } from '../types.ts';
 
 const API_BASE = '/api';
+export const IS_STATIC_DEPLOYMENT = typeof window !== 'undefined' && window.location.hostname.endsWith('.github.io');
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -12,6 +13,8 @@ export interface ApiResponse<T = any> {
 }
 
 export async function checkServerHealth(): Promise<boolean> {
+  if (IS_STATIC_DEPLOYMENT) return false;
+
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -24,6 +27,11 @@ export async function checkServerHealth(): Promise<boolean> {
 }
 
 export async function fetchEntities(): Promise<MexicanEntity[]> {
+  if (IS_STATIC_DEPLOYMENT) {
+    const { MEXICAN_ENTITIES } = await import('../data/mexicoEntities.ts');
+    return MEXICAN_ENTITIES;
+  }
+
   try {
     const res = await fetch(`${API_BASE}/entidades/`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -37,6 +45,11 @@ export async function fetchEntities(): Promise<MexicanEntity[]> {
 }
 
 export async function fetchUnitsByEntity(entityName: string): Promise<MedicalUnit[]> {
+  if (IS_STATIC_DEPLOYMENT) {
+    const { getUnitsForEntity } = await import('../data/mexicoEntities.ts');
+    return getUnitsForEntity(entityName);
+  }
+
   try {
     const res = await fetch(`${API_BASE}/unidades/?entidad=${encodeURIComponent(entityName)}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -50,6 +63,18 @@ export async function fetchUnitsByEntity(entityName: string): Promise<MedicalUni
 }
 
 export async function searchUnits(query: string, entityName?: string): Promise<MedicalUnit[]> {
+  if (IS_STATIC_DEPLOYMENT) {
+    const { INITIAL_MEDICAL_UNITS, getUnitsForEntity } = await import('../data/mexicoEntities.ts');
+    const all = entityName ? getUnitsForEntity(entityName) : INITIAL_MEDICAL_UNITS;
+    const normalizedQuery = query.trim().toLowerCase();
+    return all.filter(
+      (unit) =>
+        unit.clues.toLowerCase().includes(normalizedQuery) ||
+        unit.name.toLowerCase().includes(normalizedQuery) ||
+        unit.municipality?.toLowerCase().includes(normalizedQuery)
+    );
+  }
+
   try {
     const params = new URLSearchParams();
     params.set('q', query);
@@ -73,6 +98,8 @@ export async function searchUnits(query: string, entityName?: string): Promise<M
 }
 
 export async function fetchUnitResponses(clues: string): Promise<{ answers: Record<string, QuestionAnswer>; general?: UnitGeneralData }> {
+  if (IS_STATIC_DEPLOYMENT) return { answers: {} };
+
   try {
     const res = await fetch(`${API_BASE}/unidades/${encodeURIComponent(clues)}/respuestas/`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);

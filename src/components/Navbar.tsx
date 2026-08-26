@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApp } from '../context/AppContext.tsx';
-import { Wifi, WifiOff, RefreshCw, Building2, Home } from 'lucide-react';
+import { HardDrive, WifiOff, RefreshCw, Building2, Home } from 'lucide-react';
+import { IS_STATIC_DEPLOYMENT } from '../services/api.ts';
 
 export const Navbar: React.FC = () => {
   const {
@@ -48,7 +49,21 @@ export const Navbar: React.FC = () => {
 
           {/* Connection Status Indicator */}
           <div className="flex items-center gap-1.5">
-            {isSyncing ? (
+            {IS_STATIC_DEPLOYMENT ? (
+              <button
+                onClick={triggerManualSync}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-white/15 text-white border border-white/30 hover:bg-white/25 backdrop-blur-md transition-colors cursor-pointer"
+                title="Los datos se guardan en este navegador"
+              >
+                <HardDrive className="w-3.5 h-3.5" />
+                <span className="font-semibold">GUARDADO LOCAL</span>
+                {pendingSyncCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.2 rounded-full bg-amber-500 text-black font-bold text-[10px]">
+                    {pendingSyncCount}
+                  </span>
+                )}
+              </button>
+            ) : isSyncing ? (
               <div 
                 className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-amber-500/20 text-amber-300 border border-amber-500/40 backdrop-blur-md animate-pulse"
                 title="Sincronizando cambios pendientes con la nube"
