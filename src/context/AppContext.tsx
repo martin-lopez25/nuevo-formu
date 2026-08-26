@@ -27,8 +27,7 @@ import {
   saveUnitGeneral,
   syncBatchQueue,
   fetchUnitResponses,
-  deleteUnitAnswers,
-  IS_STATIC_DEPLOYMENT
+  deleteUnitAnswers
 } from '../services/api.ts';
 import { EQUIPMENT_CATALOG } from '../data/equipmentCatalog.ts';
 
@@ -117,7 +116,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [generalData, setGeneralData] = useState<UnitGeneralData>(defaultGeneralData);
   const [answers, setAnswers] = useState<Record<string, QuestionAnswer>>({});
   const [editingCellKey, setEditingCellKey] = useState<string | null>(null);
-  const [isOnline, setIsOnline] = useState<boolean>(!IS_STATIC_DEPLOYMENT && navigator.onLine);
+  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -146,11 +145,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Synchronize pending queue items
   const triggerManualSync = useCallback(async () => {
     if (isSyncing) return;
-    if (IS_STATIC_DEPLOYMENT) {
-      addToast('Guardado local activo', 'info', 'GitHub Pages no ejecuta un servidor. Los datos permanecen en este navegador.');
-      return;
-    }
-
     setIsSyncing(true);
     try {
       const isLive = await checkServerHealth();
@@ -202,12 +196,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Online / Offline event listeners + Health check periodic interval
   useEffect(() => {
-    if (IS_STATIC_DEPLOYMENT) {
-      setIsOnline(false);
-      refreshPendingCount();
-      return;
-    }
-
     const handleOnline = async () => {
       const live = await checkServerHealth();
       setIsOnline(live);
@@ -612,9 +600,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addToast(
         'Respuesta almacenada localmente.',
         'warning',
-        IS_STATIC_DEPLOYMENT
-          ? 'Los datos están guardados en este navegador. La sincronización en la nube requiere un servidor.'
-          : 'Estamos teniendo fallas de conexión con el servidor. Si nota que alguna pregunta no se llena, vuelva a intentar.'
+        'Estamos teniendo fallas de conexión con el servidor. Si nota que alguna pregunta no se llena, vuelva a intentar.'
       );
     }
   }, [selectedUnit, user, selectedEntity, answers, generalData, addToast, refreshPendingCount]);

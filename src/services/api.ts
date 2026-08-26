@@ -1,7 +1,55 @@
+import { createClient } from '@supabase/supabase-js';
 import { MexicanEntity, MedicalUnit, QuestionAnswer, EquipmentItem, SyncQueueItem, UnitGeneralData } from '../types.ts';
 
 const API_BASE = '/api';
-export const IS_STATIC_DEPLOYMENT = typeof window !== 'undefined' && window.location.hostname.endsWith('.github.io');
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+
+function requireSupabase() {
+  if (!supabase) throw new Error('Supabase no está configurado');
+  return supabase;
+}
+
+function answerRow(payload: Parameters<typeof saveSingleAnswer>[0]) {
+  return {
+    fecha_registro: new Date().toISOString(),
+    tipo_registro: 'respuesta',
+    entidad: payload.entidad,
+    usuario_nombre: payload.usuarioNombre,
+    usuario_email: payload.usuarioEmail,
+    clues_imb: payload.clues.trim().toUpperCase(),
+    nombre_de_la_unidad: payload.nombreUnidad,
+    categoria_gerencial_ampliada: payload.categoria,
+    internet: null,
+    consultorios_habilitados: null,
+    consultorio: payload.numeroConsultorio,
+    pregunta: payload.pregunta.trim(),
+    valor: payload.valor,
+    turno: payload.turno || null
+  };
+}
+
+async function saveAnswerRow(payload: Parameters<typeof saveSingleAnswer>[0]) {
+  const client = requireSupabase();
+  const row = answerRow(payload);
+  const query = client
+    .from('respuestas')
+    .select('id')
+    .eq('clues_imb', row.clues_imb)
+    .eq('tipo_registro', 'respuesta')
+    .eq('consultorio', row.consultorio)
+    .eq('pregunta', row.pregunta)
+    .maybeSingle();
+  const existing = await query;
+  if (existing.error) throw existing.error;
+
+  const result = existing.data
+    ? await client.from('respuestas').update(row).eq('id', existing.data.id)
+    : await client.from('respuestas').insert(row);
+  if (result.error) throw result.error;
+  return row.fecha_registro;
+}
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -13,7 +61,10 @@ export interface ApiResponse<T = any> {
 }
 
 export async function checkServerHealth(): Promise<boolean> {
-  if (IS_STATIC_DEPLOYMENT) return false;
+  if (supabase) {
+    const { error } = await supabase.from('respuestas').select('id', { head: true, count: 'exact' }).limit(1);
+    return !error;
+  }
 
   try {
     const controller = new AbortController();
@@ -27,7 +78,7 @@ export async function checkServerHealth(): Promise<boolean> {
 }
 
 export async function fetchEntities(): Promise<MexicanEntity[]> {
-  if (IS_STATIC_DEPLOYMENT) {
+  if (supabase) {
     const { MEXICAN_ENTITIES } = await import('../data/mexicoEntities.ts');
     return MEXICAN_ENTITIES;
   }
@@ -45,7 +96,7 @@ export async function fetchEntities(): Promise<MexicanEntity[]> {
 }
 
 export async function fetchUnitsByEntity(entityName: string): Promise<MedicalUnit[]> {
-  if (IS_STATIC_DEPLOYMENT) {
+  if (supabase) {
     const { getUnitsForEntity } = await import('../data/mexicoEntities.ts');
     return getUnitsForEntity(entityName);
   }
@@ -63,15 +114,14 @@ export async function fetchUnitsByEntity(entityName: string): Promise<MedicalUni
 }
 
 export async function searchUnits(query: string, entityName?: string): Promise<MedicalUnit[]> {
-  if (IS_STATIC_DEPLOYMENT) {
+  if (supabase) {
     const { INITIAL_MEDICAL_UNITS, getUnitsForEntity } = await import('../data/mexicoEntities.ts');
     const all = entityName ? getUnitsForEntity(entityName) : INITIAL_MEDICAL_UNITS;
     const normalizedQuery = query.trim().toLowerCase();
-    return all.filter(
-      (unit) =>
-        unit.clues.toLowerCase().includes(normalizedQuery) ||
-        unit.name.toLowerCase().includes(normalizedQuery) ||
-        unit.municipality?.toLowerCase().includes(normalizedQuery)
+    return all.filter((unit) =>
+      unit.clues.toLowerCase().includes(normalizedQuery) ||
+      unit.name.toLowerCase().includes(normalizedQuery) ||
+      unit.municipality?.toLowerCase().includes(normalizedQuery)
     );
   }
 
@@ -98,7 +148,51 @@ export async function searchUnits(query: string, entityName?: string): Promise<M
 }
 
 export async function fetchUnitResponses(clues: string): Promise<{ answers: Record<string, QuestionAnswer>; general?: UnitGeneralData }> {
-  if (IS_STATIC_DEPLOYMENT) return { answers: {} };
+  if (supabase) {
+    const normalizedClues = clues.trim().toUpperCase();
+    const { data, error } = await supabase
+      .from('respuestas')
+      .select('*')
+      .eq('clues_imb', normalizedClues);
+    if (error) throw error;
+
+    const answers: Record<string, QuestionAnswer> = {};
+    const turns: UnitGeneralData['turns'] = {};
+    const rows = data || [];
+    const config = rows.find((row) => row.tipo_registro === 'unidad');
+    const officeCount = rows.find((row) => row.tipo_registro === 'respuesta' && row.pregunta === 'consultorios');
+
+    rows
+      .filter((row) => row.tipo_registro === 'respuesta' && row.pregunta !== 'consultorios')
+      .forEach((row) => {
+        const officeNumber = Number(row.consultorio);
+        if (row.turno) turns[officeNumber] = row.turno;
+        answers[`${officeNumber}__${row.pregunta}`] = {
+          clues: normalizedClues,
+          officeNumber,
+          question: row.pregunta,
+          value: row.valor === null ? null : Number(row.valor),
+          status: 'saved_cloud',
+          turn: row.turno || '',
+          updatedAt: row.fecha_registro || new Date().toISOString(),
+          version: 1
+        };
+      });
+
+    const general = config ? {
+      clues: normalizedClues,
+      entidad: config.entidad || '',
+      usuarioNombre: config.usuario_nombre || '',
+      hasInternet: config.internet || 'PENDIENTE',
+      enabledOffices: Number(config.consultorios_habilitados) || 0,
+      unoperatedOffices: 0,
+      configuredOffices: Number(officeCount?.consultorio) || 0,
+      turns,
+      updatedAt: config.fecha_registro || new Date().toISOString()
+    } satisfies UnitGeneralData : undefined;
+
+    return { answers, general };
+  }
 
   try {
     const res = await fetch(`${API_BASE}/unidades/${encodeURIComponent(clues)}/respuestas/`);
@@ -160,6 +254,11 @@ export async function saveSingleAnswer(payload: {
   tipoRegistro?: string;
   version?: number;
 }): Promise<ApiResponse> {
+  if (supabase) {
+    const serverTimestamp = await saveAnswerRow(payload);
+    return { success: true, message: 'Respuesta guardada correctamente', serverTimestamp };
+  }
+
   const res = await fetch(`${API_BASE}/respuestas/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -177,6 +276,66 @@ export async function saveSingleAnswer(payload: {
 }
 
 export async function saveUnitGeneral(clues: string, generalData: UnitGeneralData): Promise<ApiResponse> {
+  if (supabase) {
+    const client = requireSupabase();
+    const normalizedClues = clues.trim().toUpperCase();
+    const timestamp = new Date().toISOString();
+    const configRow = {
+      fecha_registro: timestamp,
+      tipo_registro: 'unidad',
+      entidad: generalData.entidad || '',
+      usuario_nombre: generalData.usuarioNombre || '',
+      clues_imb: normalizedClues,
+      internet: generalData.hasInternet,
+      consultorios_habilitados: generalData.enabledOffices,
+      consultorio: null,
+      pregunta: null,
+      valor: null,
+      turno: null
+    };
+    const countRow = {
+      fecha_registro: timestamp,
+      tipo_registro: 'respuesta',
+      entidad: generalData.entidad || '',
+      usuario_nombre: generalData.usuarioNombre || '',
+      clues_imb: normalizedClues,
+      internet: null,
+      consultorios_habilitados: null,
+      consultorio: generalData.configuredOffices,
+      pregunta: 'consultorios',
+      valor: null,
+      turno: null
+    };
+
+    const existingConfig = await client.from('respuestas').select('id').eq('clues_imb', normalizedClues).eq('tipo_registro', 'unidad').maybeSingle();
+    if (existingConfig.error) throw existingConfig.error;
+    const configResult = existingConfig.data
+      ? await client.from('respuestas').update(configRow).eq('id', existingConfig.data.id)
+      : await client.from('respuestas').insert(configRow);
+    if (configResult.error) throw configResult.error;
+
+    const existingCount = await client.from('respuestas').select('id').eq('clues_imb', normalizedClues).eq('tipo_registro', 'respuesta').eq('pregunta', 'consultorios').maybeSingle();
+    if (existingCount.error) throw existingCount.error;
+    const countResult = existingCount.data
+      ? await client.from('respuestas').update(countRow).eq('id', existingCount.data.id)
+      : await client.from('respuestas').insert(countRow);
+    if (countResult.error) throw countResult.error;
+
+    for (const [officeNumber, turn] of Object.entries(generalData.turns)) {
+      if (!turn) continue;
+      const { error } = await client
+        .from('respuestas')
+        .update({ turno: turn, fecha_registro: timestamp })
+        .eq('clues_imb', normalizedClues)
+        .eq('tipo_registro', 'respuesta')
+        .eq('consultorio', Number(officeNumber))
+        .neq('pregunta', 'consultorios');
+      if (error) throw error;
+    }
+
+    return { success: true, message: 'Configuración general guardada', data: generalData, serverTimestamp: timestamp };
+  }
+
   const res = await fetch(`${API_BASE}/unidades/${encodeURIComponent(clues)}/configuracion/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -190,6 +349,12 @@ export async function saveUnitGeneral(clues: string, generalData: UnitGeneralDat
 }
 
 export async function deleteUnitAnswers(clues: string): Promise<ApiResponse<{ deletedCount: number }>> {
+  if (supabase) {
+    const { data, error } = await supabase.rpc('eliminar_respuestas_unidad', { p_clues: clues.trim().toUpperCase() });
+    if (error) throw error;
+    return { success: true, data: { deletedCount: Number(data) || 0 } };
+  }
+
   const res = await fetch(`${API_BASE}/unidades/${encodeURIComponent(clues)}/respuestas/`, {
     method: 'DELETE'
   });
@@ -201,6 +366,19 @@ export async function deleteUnitAnswers(clues: string): Promise<ApiResponse<{ de
 }
 
 export async function syncBatchQueue(items: SyncQueueItem[]): Promise<ApiResponse<{ syncedIds: string[] }>> {
+  if (supabase) {
+    const syncedIds: string[] = [];
+    for (const item of items) {
+      if (item.action === 'save_answer') {
+        await saveSingleAnswer(item.payload as Parameters<typeof saveSingleAnswer>[0]);
+      } else if (item.action === 'save_general') {
+        await saveUnitGeneral(item.clues, item.payload as unknown as UnitGeneralData);
+      }
+      syncedIds.push(item.id);
+    }
+    return { success: true, data: { syncedIds } };
+  }
+
   const res = await fetch(`${API_BASE}/sincronizar/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

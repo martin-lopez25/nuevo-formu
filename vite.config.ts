@@ -2,7 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import fs from 'fs';
 import path from 'path';
-import {defineConfig} from 'vite';
+import {defineConfig, loadEnv} from 'vite';
 
 function pagesIndexPlugin() {
   const sourcePath = path.resolve(__dirname, 'index.source.html');
@@ -11,6 +11,7 @@ function pagesIndexPlugin() {
 
   return {
     name: 'pages-index',
+    apply: 'build' as const,
     buildStart() {
       fs.rmSync(path.resolve(__dirname, 'pages-assets'), { recursive: true, force: true });
     },
@@ -22,10 +23,16 @@ function pagesIndexPlugin() {
   };
 }
 
-export default defineConfig(() => {
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+
   return {
     base: '/nuevo-formu/',
     publicDir: false as const,
+    define: {
+      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.SUPABASE_URL || ''),
+      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.SUPABASE_ANON_KEY || ''),
+    },
     build: {
       outDir: '.',
       emptyOutDir: false,
