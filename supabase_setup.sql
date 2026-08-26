@@ -81,6 +81,10 @@ as $$
 declare
   filas_eliminadas integer;
 begin
+  if nullif(trim(p_clues), '') is null then
+    raise exception 'CLUES es obligatoria';
+  end if;
+
   perform set_config('app.permitir_borrado_respuestas', 'on', true);
 
   delete from public.respuestas
@@ -93,7 +97,29 @@ begin
 end;
 $$;
 
-revoke all on function public.eliminar_respuestas_unidad(text) from public, anon, authenticated;
-grant execute on function public.eliminar_respuestas_unidad(text) to service_role;
+revoke all on function public.eliminar_respuestas_unidad(text) from public, authenticated;
+grant execute on function public.eliminar_respuestas_unidad(text) to anon, service_role;
 
-alter table public.respuestas disable row level security;
+alter table public.respuestas enable row level security;
+
+grant select, insert, update on table public.respuestas to anon;
+grant usage, select on all sequences in schema public to anon;
+
+drop policy if exists respuestas_anon_select on public.respuestas;
+create policy respuestas_anon_select
+  on public.respuestas for select
+  to anon
+  using (true);
+
+drop policy if exists respuestas_anon_insert on public.respuestas;
+create policy respuestas_anon_insert
+  on public.respuestas for insert
+  to anon
+  with check (true);
+
+drop policy if exists respuestas_anon_update on public.respuestas;
+create policy respuestas_anon_update
+  on public.respuestas for update
+  to anon
+  using (true)
+  with check (true);
