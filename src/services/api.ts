@@ -20,7 +20,6 @@ function answerRow(payload: Parameters<typeof saveSingleAnswer>[0]) {
     usuario_email: payload.usuarioEmail,
     clues_imb: payload.clues.trim().toUpperCase(),
     nombre_de_la_unidad: payload.nombreUnidad,
-    categoria_gerencial_ampliada: payload.categoria,
     internet: null,
     consultorios_habilitados: null,
     consultorio: payload.numeroConsultorio,
