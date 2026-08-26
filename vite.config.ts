@@ -1,16 +1,37 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import fs from 'fs';
 import path from 'path';
 import {defineConfig} from 'vite';
+
+function pagesIndexPlugin() {
+  const sourcePath = path.resolve(__dirname, 'index.source.html');
+  const outputPath = path.resolve(__dirname, 'index.html');
+  const sourceHtml = fs.readFileSync(sourcePath, 'utf8');
+
+  return {
+    name: 'pages-index',
+    closeBundle() {
+      const compiledHtml = fs.readFileSync(sourcePath, 'utf8');
+      fs.writeFileSync(outputPath, compiledHtml);
+      fs.writeFileSync(sourcePath, sourceHtml);
+    },
+  };
+}
 
 export default defineConfig(() => {
   return {
     base: '/nuevo-formu/',
-    publicDir: 'imagenes',
+    publicDir: false as const,
     build: {
-      outDir: 'docs',
+      outDir: '.',
+      emptyOutDir: false,
+      assetsDir: 'pages-assets',
+      rollupOptions: {
+        input: path.resolve(__dirname, 'index.source.html'),
+      },
     },
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), pagesIndexPlugin()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

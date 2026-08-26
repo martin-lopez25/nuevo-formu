@@ -14,10 +14,10 @@ interface ImageFragmentsTransitionProps {
 const BASE_URL = import.meta.env.BASE_URL;
 
 const SECTION_BACKGROUNDS: Record<AppSection, string> = {
-  inicio: `${BASE_URL}inicio.jpg`,
-  instrucciones: `${BASE_URL}instrucciones.webp`,
-  instrucciones_2: `${BASE_URL}instrucciones_2.jpeg`,
-  formulario: `${BASE_URL}formulario.png`,
+  inicio: `${BASE_URL}imagenes/inicio.jpg`,
+  instrucciones: `${BASE_URL}imagenes/instrucciones.webp`,
+  instrucciones_2: `${BASE_URL}imagenes/instrucciones_2.jpeg`,
+  formulario: `${BASE_URL}imagenes/formulario.png`,
 };
 
 export const ImageFragmentsTransition: React.FC<ImageFragmentsTransitionProps> = ({ section }) => {
