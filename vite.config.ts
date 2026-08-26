@@ -7,6 +7,9 @@ export default defineConfig(() => {
   return {
     base: '/nuevo-formu/',
     publicDir: 'imagenes',
+    build: {
+      outDir: 'docs',
+    },
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
