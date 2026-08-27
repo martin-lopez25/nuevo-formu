@@ -18,6 +18,51 @@ def write_json(path: Path, payload: object) -> None:
     )
 
 
+def export_clues_catalog(clues_path: Path, output_dir: Path) -> None:
+    clues_frame = pd.read_parquet(
+        clues_path,
+        columns=["clues_imb", "entidad", "nombre_de_la_unidad"],
+    )
+    unit_records = clues_frame.dropna(subset=["clues_imb"]).copy()
+    unit_records["clues_imb"] = unit_records["clues_imb"].astype(str).str.strip().str.upper()
+    unit_records["entidad"] = unit_records["entidad"].fillna("").astype(str).str.strip().str.upper()
+    unit_records["nombre_de_la_unidad"] = (
+        unit_records["nombre_de_la_unidad"].fillna("SIN NOMBRE").astype(str).str.strip()
+    )
+    unit_records = unit_records.loc[unit_records["clues_imb"] != ""]
+    unit_records = unit_records.drop_duplicates(subset=["clues_imb"], keep="first")
+
+    units = [
+        {
+            "clues": row["clues_imb"],
+            "name": row["nombre_de_la_unidad"] or "SIN NOMBRE",
+            "entity": row["entidad"],
+        }
+        for row in unit_records.to_dict(orient="records")
+    ]
+
+    entity_records = (
+        unit_records.loc[unit_records["entidad"] != ""]
+        .groupby("entidad", as_index=False)["clues_imb"]
+        .nunique()
+        .sort_values("entidad")
+    )
+    entities = [
+        {
+            "id": str(index).zfill(2),
+            "name": row["entidad"],
+            "code": str(index).zfill(2),
+            "totalUnits": int(row["clues_imb"]),
+        }
+        for index, row in enumerate(entity_records.to_dict(orient="records"), start=1)
+    ]
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    write_json(output_dir / "entities.json", entities)
+    write_json(output_dir / "units.json", units)
+    print(f"Exportados: {len(entities)} entidades y {len(units)} unidades.")
+
+
 def export_catalogs(
     questions_path: Path,
     units_path: Path,
@@ -93,11 +138,20 @@ def export_catalogs(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--questions", type=Path, required=True)
-    parser.add_argument("--units", type=Path, required=True)
+    parser.add_argument("--questions", type=Path)
+    parser.add_argument("--units", type=Path)
     parser.add_argument("--clues", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--clues-only", action="store_true")
     arguments = parser.parse_args()
+
+    if arguments.clues_only:
+        export_clues_catalog(arguments.clues, arguments.output)
+        return
+
+    if not arguments.questions or not arguments.units:
+        parser.error("--questions y --units son obligatorios sin --clues-only")
+
     export_catalogs(
         arguments.questions,
         arguments.units,

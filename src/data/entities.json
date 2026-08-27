@@ -3,132 +3,162 @@
     "id": "01",
     "name": "BAJA CALIFORNIA",
     "code": "01",
-    "totalUnits": 73
+    "totalUnits": 169
   },
   {
     "id": "02",
     "name": "BAJA CALIFORNIA SUR",
     "code": "02",
-    "totalUnits": 51
+    "totalUnits": 43
   },
   {
     "id": "03",
     "name": "CAMPECHE",
     "code": "03",
-    "totalUnits": 31
+    "totalUnits": 125
   },
   {
     "id": "04",
     "name": "CHIAPAS",
     "code": "04",
-    "totalUnits": 24
+    "totalUnits": 647
   },
   {
     "id": "05",
     "name": "CIUDAD DE MEXICO",
     "code": "05",
-    "totalUnits": 192
+    "totalUnits": 221
   },
   {
     "id": "06",
     "name": "COLIMA",
     "code": "06",
-    "totalUnits": 60
+    "totalUnits": 97
   },
   {
     "id": "07",
-    "name": "GUERRERO",
+    "name": "GUANAJUATO",
     "code": "07",
-    "totalUnits": 592
+    "totalUnits": 1
   },
   {
     "id": "08",
-    "name": "HIDALGO",
+    "name": "GUERRERO",
     "code": "08",
-    "totalUnits": 24
+    "totalUnits": 595
   },
   {
     "id": "09",
-    "name": "MEXICO",
+    "name": "HIDALGO",
     "code": "09",
-    "totalUnits": 221
+    "totalUnits": 525
   },
   {
     "id": "10",
-    "name": "MICHOACAN DE OCAMPO",
+    "name": "HRAES",
     "code": "10",
-    "totalUnits": 27
+    "totalUnits": 7
   },
   {
     "id": "11",
-    "name": "MORELOS",
+    "name": "INIEMS",
     "code": "11",
-    "totalUnits": 46
+    "totalUnits": 4
   },
   {
     "id": "12",
-    "name": "NAYARIT",
+    "name": "MEXICO",
     "code": "12",
-    "totalUnits": 56
+    "totalUnits": 1022
   },
   {
     "id": "13",
-    "name": "OAXACA",
+    "name": "MICHOACAN DE OCAMPO",
     "code": "13",
-    "totalUnits": 53
+    "totalUnits": 452
   },
   {
     "id": "14",
-    "name": "PUEBLA",
+    "name": "MORELOS",
     "code": "14",
-    "totalUnits": 16
+    "totalUnits": 205
   },
   {
     "id": "15",
-    "name": "QUINTANA ROO",
+    "name": "NAYARIT",
     "code": "15",
-    "totalUnits": 133
+    "totalUnits": 224
   },
   {
     "id": "16",
-    "name": "SAN LUIS POTOSI",
+    "name": "OAXACA",
     "code": "16",
-    "totalUnits": 28
+    "totalUnits": 936
   },
   {
     "id": "17",
-    "name": "SINALOA",
+    "name": "PUEBLA",
     "code": "17",
-    "totalUnits": 66
+    "totalUnits": 726
   },
   {
     "id": "18",
-    "name": "SONORA",
+    "name": "QUINTANA ROO",
     "code": "18",
-    "totalUnits": 123
+    "totalUnits": 95
   },
   {
     "id": "19",
-    "name": "TABASCO",
+    "name": "SAN LUIS POTOSI",
     "code": "19",
-    "totalUnits": 132
+    "totalUnits": 287
   },
   {
     "id": "20",
-    "name": "TAMAULIPAS",
+    "name": "SINALOA",
     "code": "20",
-    "totalUnits": 150
+    "totalUnits": 257
   },
   {
     "id": "21",
-    "name": "VERACRUZ DE IGNACIO DE LA LLAVE",
+    "name": "SONORA",
     "code": "21",
-    "totalUnits": 74
+    "totalUnits": 250
   },
   {
     "id": "22",
-    "name": "ZACATECAS",
+    "name": "TABASCO",
     "code": "22",
-    "totalUnits": 19
+    "totalUnits": 429
+  },
+  {
+    "id": "23",
+    "name": "TAMAULIPAS",
+    "code": "23",
+    "totalUnits": 289
+  },
+  {
+    "id": "24",
+    "name": "TLAXCALA",
+    "code": "24",
+    "totalUnits": 219
+  },
+  {
+    "id": "25",
+    "name": "VERACRUZ DE IGNACIO DE LA LLAVE",
+    "code": "25",
+    "totalUnits": 845
+  },
+  {
+    "id": "26",
+    "name": "YUCATAN",
+    "code": "26",
+    "totalUnits": 2
+  },
+  {
+    "id": "27",
+    "name": "ZACATECAS",
+    "code": "27",
+    "totalUnits": 246
   }
 ]
