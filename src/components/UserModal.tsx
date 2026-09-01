@@ -6,9 +6,10 @@ import { User, Mail, MapPin, CheckCircle, AlertCircle, X, ShieldAlert } from 'lu
 interface UserModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onCancel: () => void;
 }
 
-export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose }) => {
+export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onCancel }) => {
   const { selectedEntity, handleSaveUser, user } = useApp();
   const [name, setName] = useState<string>(user?.name || '');
   const [email, setEmail] = useState<string>(user?.email || '');
@@ -117,16 +118,15 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose }) => {
           transition={{ duration: 0.3 }}
           className="relative max-w-md w-full rounded-3xl p-6 sm:p-8 backdrop-blur-xl bg-gradient-to-b from-[#9B2247]/55 via-[#611232]/45 to-black/65 border border-white/25 shadow-[0_25px_60px_rgba(0,0,0,0.6)] text-white"
         >
-          {/* Close button if user was already set */}
-          {user && (
-            <button
-              onClick={onClose}
-              className="absolute top-4 right-4 text-white/60 hover:text-white p-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 transition-colors cursor-pointer"
-              aria-label="Cerrar modal"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={onCancel}
+            className="absolute top-4 right-4 text-white/60 hover:text-white p-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 transition-colors cursor-pointer"
+            aria-label="Cancelar registro y volver a entidades"
+            title="Volver a entidades"
+          >
+            <X className="w-4 h-4" />
+          </button>
 
           {/* Header */}
           <div className="text-center mb-6">

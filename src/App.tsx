@@ -225,6 +225,10 @@ const MainAppContent: React.FC = () => {
       <UserModal
         isOpen={isUserModalOpen}
         onClose={() => setIsUserModalOpen(false)}
+        onCancel={() => {
+          setIsUserModalOpen(false);
+          handleChangeEntity();
+        }}
       />
       <UnitDetailsModal />
       <ZeroOfficesModal />
