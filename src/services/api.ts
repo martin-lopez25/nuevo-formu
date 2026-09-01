@@ -59,6 +59,54 @@ export interface ApiResponse<T = any> {
   version?: number;
 }
 
+export interface AdminResponseRow {
+  id: number;
+  fecha_registro: string;
+  tipo_registro: 'unidad' | 'respuesta';
+  entidad: string | null;
+  usuario_nombre: string | null;
+  usuario_email: string | null;
+  clues_imb: string;
+  nombre_de_la_unidad: string | null;
+  internet: string | null;
+  consultorios_habilitados: number | null;
+  consultorio: number | null;
+  pregunta: string | null;
+  valor: number | null;
+  turno: string | null;
+}
+
+export async function authenticateAdmin(username: string, password: string): Promise<string> {
+  const response = await fetch(`${API_BASE}/admin/login/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password })
+  });
+  const json = await response.json();
+  if (!response.ok || !json.success || !json.token) {
+    throw new Error(json.message || 'No fue posible iniciar sesión');
+  }
+  return json.token;
+}
+
+export async function logoutAdmin(token: string): Promise<void> {
+  await fetch(`${API_BASE}/admin/logout/`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export async function fetchAdminResponses(token: string): Promise<AdminResponseRow[]> {
+  const response = await fetch(`${API_BASE}/admin/respuestas/`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const json = await response.json();
+  if (!response.ok || !json.success) {
+    throw new Error(json.message || 'No fue posible consultar la base de datos');
+  }
+  return json.data || [];
+}
+
 export async function checkServerHealth(): Promise<boolean> {
   if (supabase) {
     const { error } = await supabase.from('respuestas').select('id', { head: true, count: 'exact' }).limit(1);

@@ -1,8 +1,14 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { useApp } from '../context/AppContext.tsx';
 import { Wifi, WifiOff, RefreshCw, Building2, Home } from 'lucide-react';
 
-export const Navbar: React.FC = () => {
+interface NavbarProps {
+  onSecretAccess: () => void;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({ onSecretAccess }) => {
+  const logoClickCount = useRef(0);
+  const logoClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const {
     activeSection,
     setActiveSection,
@@ -12,6 +18,27 @@ export const Navbar: React.FC = () => {
     triggerManualSync,
     selectedUnit,
   } = useApp();
+
+  const handleLogoClick = () => {
+    if (activeSection !== 'inicio') {
+      logoClickCount.current = 0;
+      if (logoClickTimer.current) clearTimeout(logoClickTimer.current);
+      return;
+    }
+
+    logoClickCount.current += 1;
+    if (logoClickTimer.current) clearTimeout(logoClickTimer.current);
+
+    if (logoClickCount.current === 4) {
+      logoClickCount.current = 0;
+      onSecretAccess();
+      return;
+    }
+
+    logoClickTimer.current = setTimeout(() => {
+      logoClickCount.current = 0;
+    }, 1800);
+  };
 
   return (
     <header className="sticky top-0 z-40 bg-transparent text-white transition-all duration-300">
@@ -28,11 +55,19 @@ export const Navbar: React.FC = () => {
             <Home className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
 
-          <img
-            src="https://imssbienestar.gob.mx/assets/img/imb_b.svg"
-            alt="IMSS Bienestar"
-            className="h-8 sm:h-10 w-auto"
-          />
+          <button
+            type="button"
+            onClick={handleLogoClick}
+            className="cursor-default select-none"
+            aria-label="IMSS Bienestar"
+          >
+            <img
+              src="https://imssbienestar.gob.mx/assets/img/imb_b.svg"
+              alt="IMSS Bienestar"
+              className="h-8 sm:h-10 w-auto"
+              draggable={false}
+            />
+          </button>
         </div>
 
         {/* Right: Connection & Status Indicators */}

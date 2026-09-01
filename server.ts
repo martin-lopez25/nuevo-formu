@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
+import { randomBytes, timingSafeEqual } from 'crypto';
 
 dotenv.config();
 
@@ -49,6 +50,31 @@ interface StoredUnitConfig {
 // In-Memory store for quick response and persistence fallback
 const answersStore = new Map<string, StoredAnswer>();
 const unitConfigs = new Map<string, StoredUnitConfig>();
+const adminSessions = new Map<string, number>();
+const ADMIN_SESSION_DURATION_MS = 30 * 60 * 1000;
+
+function credentialsMatch(username: string, password: string) {
+  const expectedUsername = process.env.ADMIN_USERNAME || 'add.31';
+  const expectedPassword = process.env.ADMIN_PASSWORD || '3180';
+  const provided = Buffer.from(`${username}\0${password}`);
+  const expected = Buffer.from(`${expectedUsername}\0${expectedPassword}`);
+  return provided.length === expected.length && timingSafeEqual(provided, expected);
+}
+
+function getAdminToken(req: express.Request) {
+  const authorization = req.header('authorization') || '';
+  return authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+}
+
+function hasValidAdminSession(req: express.Request) {
+  const token = getAdminToken(req);
+  const expiresAt = adminSessions.get(token);
+  if (!token || !expiresAt || expiresAt <= Date.now()) {
+    if (token) adminSessions.delete(token);
+    return false;
+  }
+  return true;
+}
 
 // Lazy Supabase client initialization
 let supabaseClient: any = null;
@@ -197,6 +223,53 @@ app.get('/api/health', (req, res) => {
     supabaseConnected: Boolean(process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)),
     timestamp: new Date().toISOString()
   });
+});
+
+app.post('/api/admin/login/', (req, res) => {
+  const username = String(req.body?.username || '');
+  const password = String(req.body?.password || '');
+  if (!credentialsMatch(username, password)) {
+    return res.status(401).json({ success: false, message: 'Usuario o contraseña incorrectos' });
+  }
+
+  const token = randomBytes(32).toString('hex');
+  adminSessions.set(token, Date.now() + ADMIN_SESSION_DURATION_MS);
+  return res.json({ success: true, token });
+});
+
+app.post('/api/admin/logout/', (req, res) => {
+  const token = getAdminToken(req);
+  if (token) adminSessions.delete(token);
+  return res.json({ success: true });
+});
+
+app.get('/api/admin/respuestas/', async (req, res) => {
+  if (!hasValidAdminSession(req)) {
+    return res.status(401).json({ success: false, message: 'La sesión administrativa no es válida' });
+  }
+
+  try {
+    const sb = getSupabase();
+    if (sb) {
+      const { data, error } = await sb
+        .from('respuestas')
+        .select('*')
+        .order('fecha_registro', { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return res.json({ success: true, data: data || [] });
+    }
+
+    const storedRows = Array.from(answersStore.values())
+      .map(answerToDatabase)
+      .sort((first, second) => second.fecha_registro.localeCompare(first.fecha_registro))
+      .slice(0, 500)
+      .map((row, index) => ({ id: index + 1, ...row }));
+    return res.json({ success: true, data: storedRows });
+  } catch (error) {
+    console.error('Admin responses error:', error);
+    return res.status(500).json({ success: false, message: 'No fue posible consultar la base de datos' });
+  }
 });
 
 // 2. Catalog of Entities

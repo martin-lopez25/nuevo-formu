@@ -14,6 +14,7 @@ import { QuestionnaireTable } from './components/QuestionnaireTable.tsx';
 import { UnitDetailsModal } from './components/UnitDetailsModal.tsx';
 import { ZeroOfficesModal } from './components/ZeroOfficesModal.tsx';
 import { ConflictModal } from './components/ConflictModal.tsx';
+import { SecretAdminModal } from './components/SecretAdminModal.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   User,
@@ -42,6 +43,7 @@ const MainAppContent: React.FC = () => {
   } = useApp();
 
   const [isUserModalOpen, setIsUserModalOpen] = useState<boolean>(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
   // Smooth auto-scroll to question row inside table
@@ -71,7 +73,7 @@ const MainAppContent: React.FC = () => {
       <ImageFragmentsTransition section={activeSection} />
 
       {/* Main Global Header */}
-      <Navbar />
+      <Navbar onSecretAccess={() => setIsAdminModalOpen(true)} />
 
       {/* Main Dynamic View Area */}
       <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 flex flex-col justify-center">
@@ -227,6 +229,10 @@ const MainAppContent: React.FC = () => {
       <UnitDetailsModal />
       <ZeroOfficesModal />
       <ConflictModal />
+      <SecretAdminModal
+        isOpen={isAdminModalOpen}
+        onClose={() => setIsAdminModalOpen(false)}
+      />
 
       {/* Accessible Toast Notifications */}
       <Toasts />
