@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { MexicanEntity, MedicalUnit, QuestionAnswer, EquipmentItem, SyncQueueItem, UnitGeneralData } from '../types.ts';
 
-const API_BASE = '/api';
+const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '') + '/api';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
@@ -76,13 +76,21 @@ export interface AdminResponseRow {
   turno: string | null;
 }
 
+async function readApiResponse(response: Response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error('El servidor administrativo no está disponible en este sitio. Configure la URL del backend.');
+  }
+  return response.json();
+}
+
 export async function authenticateAdmin(username: string, password: string): Promise<string> {
   const response = await fetch(`${API_BASE}/admin/login/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password })
   });
-  const json = await response.json();
+  const json = await readApiResponse(response);
   if (!response.ok || !json.success || !json.token) {
     throw new Error(json.message || 'No fue posible iniciar sesión');
   }
@@ -100,7 +108,7 @@ export async function fetchAdminResponses(token: string): Promise<AdminResponseR
   const response = await fetch(`${API_BASE}/admin/respuestas/`, {
     headers: { Authorization: `Bearer ${token}` }
   });
-  const json = await response.json();
+  const json = await readApiResponse(response);
   if (!response.ok || !json.success) {
     throw new Error(json.message || 'No fue posible consultar la base de datos');
   }
