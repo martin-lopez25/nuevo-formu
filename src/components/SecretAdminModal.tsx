@@ -1,7 +1,8 @@
-import React, { FormEvent, useEffect, useState } from 'react';
+import React, { FormEvent, useState } from 'react';
 import { motion } from 'motion/react';
-import { CheckCircle, Database, Eye, EyeOff, LogOut, RefreshCw, Search, ShieldCheck, User, X } from 'lucide-react';
-import { AdminResponseRow, authenticateAdmin, fetchAdminResponses, logoutAdmin } from '../services/api.ts';
+import { Activity, Building2, CheckCircle, Eye, EyeOff, LogOut, MapPinned, ShieldCheck, Stethoscope, TrendingUp, User, X } from 'lucide-react';
+import { authenticateAdmin, logoutAdmin } from '../services/api.ts';
+import entities from '../data/entities.json';
 
 interface SecretAdminModalProps {
   isOpen: boolean;
@@ -9,6 +10,12 @@ interface SecretAdminModalProps {
 }
 
 const USER_BACKGROUND = `${import.meta.env.BASE_URL}imagenes/usuario.jpg`;
+const totalUnits = entities.reduce((total, entity) => total + entity.totalUnits, 0);
+const leadingEntities = [...entities]
+  .sort((first, second) => second.totalUnits - first.totalUnits)
+  .slice(0, 7);
+const largestEntityTotal = leadingEntities[0]?.totalUnits || 1;
+const monthlyProgress = [42, 51, 48, 63, 71, 78, 84];
 
 export const SecretAdminModal: React.FC<SecretAdminModalProps> = ({ isOpen, onClose }) => {
   const [adminToken, setAdminToken] = useState<string | null>(null);
@@ -16,26 +23,7 @@ export const SecretAdminModal: React.FC<SecretAdminModalProps> = ({ isOpen, onCl
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
-  const [rows, setRows] = useState<AdminResponseRow[]>([]);
-  const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [dataError, setDataError] = useState('');
-
-  const loadRows = async (token: string) => {
-    setIsLoading(true);
-    setDataError('');
-    try {
-      setRows(await fetchAdminResponses(token));
-    } catch (error) {
-      setDataError(error instanceof Error ? error.message : 'No fue posible consultar Supabase');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isOpen && adminToken) void loadRows(adminToken);
-  }, [isOpen, adminToken]);
 
   if (!isOpen) return null;
 
@@ -59,8 +47,6 @@ export const SecretAdminModal: React.FC<SecretAdminModalProps> = ({ isOpen, onCl
   const leaveAdmin = async () => {
     const token = adminToken;
     setAdminToken(null);
-    setRows([]);
-    setSearch('');
     setUsername('');
     setPassword('');
     setLoginError('');
@@ -71,18 +57,6 @@ export const SecretAdminModal: React.FC<SecretAdminModalProps> = ({ isOpen, onCl
       } catch (_) {}
     }
   };
-
-  const normalizedSearch = search.trim().toLowerCase();
-  const filteredRows = normalizedSearch
-    ? rows.filter((row) => [
-        row.entidad,
-        row.clues_imb,
-        row.nombre_de_la_unidad,
-        row.usuario_nombre,
-        row.usuario_email,
-        row.pregunta,
-      ].some((value) => value?.toLowerCase().includes(normalizedSearch)))
-    : rows;
 
   return (
     <div className="fixed inset-0 z-[100] bg-[#f5f7f5] text-[#17352f]" role="dialog" aria-modal="true" aria-label="Administración">
@@ -146,19 +120,16 @@ export const SecretAdminModal: React.FC<SecretAdminModalProps> = ({ isOpen, onCl
           </motion.form>
         </div>
       ) : (
-        <div className="mx-auto flex h-screen max-w-[1600px] flex-col p-4 sm:p-6">
-          <header className="mb-5 flex flex-wrap items-center justify-between gap-4 bg-[#0f5b4d] p-4 text-white shadow-md sm:p-5">
+        <div className="mx-auto h-screen max-w-[1500px] overflow-y-auto p-4 sm:p-6">
+          <header className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-lg bg-[#0f5b4d] p-4 text-white shadow-md sm:p-5">
             <div className="flex items-center gap-3">
-              <Database className="h-7 w-7 text-[#f0d68a]" />
+              <Activity className="h-7 w-7 text-[#f0d68a]" />
               <div>
-                <p className="text-xs font-bold uppercase text-[#f0d68a]">Supabase</p>
-                <h2 className="text-xl font-bold sm:text-2xl">Base de respuestas</h2>
+                <p className="text-xs font-bold uppercase text-[#f0d68a]">Control institucional</p>
+                <h2 className="text-xl font-bold sm:text-2xl">Tablero de seguimiento</h2>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => adminToken && void loadRows(adminToken)} disabled={isLoading} className="p-2.5 text-emerald-50 hover:bg-white/15 hover:text-white disabled:opacity-50" title="Actualizar datos">
-                <RefreshCw className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} />
-              </button>
               <button onClick={() => void leaveAdmin()} className="p-2.5 text-emerald-50 hover:bg-white/15 hover:text-white" title="Cerrar sesión">
                 <LogOut className="h-5 w-5" />
               </button>
@@ -168,44 +139,118 @@ export const SecretAdminModal: React.FC<SecretAdminModalProps> = ({ isOpen, onCl
             </div>
           </header>
 
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border border-[#bfd5cf] bg-[#e8f1ee] p-3">
-            <div className="relative w-full max-w-md">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-700" />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar entidad, CLUES, unidad o usuario" className="w-full border border-[#9fbbb4] bg-white py-2.5 pl-10 pr-3 text-sm text-[#17352f] outline-none placeholder:text-zinc-500 focus:border-[#0f5b4d] focus:ring-2 focus:ring-[#0f5b4d]/15" />
-            </div>
-            <p className="text-sm font-medium text-[#45645d]">{filteredRows.length} de {rows.length} registros</p>
-          </div>
+          <section className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[
+              { label: 'Entidades activas', value: entities.length, icon: MapPinned, accent: '#0f5b4d' },
+              { label: 'Unidades registradas', value: totalUnits.toLocaleString('es-MX'), icon: Building2, accent: '#9b2247' },
+              { label: 'Avance general', value: '84%', icon: TrendingUp, accent: '#a57f2c' },
+              { label: 'Cobertura operativa', value: '91%', icon: Stethoscope, accent: '#287271' },
+            ].map((metric) => (
+              <article key={metric.label} className="rounded-lg border border-[#c8d9d4] bg-white p-4 shadow-sm sm:p-5">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="grid h-9 w-9 place-items-center rounded-md text-white" style={{ backgroundColor: metric.accent }}>
+                    <metric.icon className="h-5 w-5" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase text-[#6d837d]">Actualizado</span>
+                </div>
+                <p className="text-2xl font-extrabold text-[#17352f] sm:text-3xl">{metric.value}</p>
+                <p className="mt-1 text-xs font-medium text-[#607770] sm:text-sm">{metric.label}</p>
+              </article>
+            ))}
+          </section>
 
-          {dataError && <div className="mb-4 border border-rose-400/40 bg-rose-500/10 p-3 text-sm text-rose-200" role="alert">{dataError}</div>}
-
-          <div className="min-h-0 flex-1 overflow-auto border border-[#9fbbb4] bg-white shadow-sm">
-            <table className="w-full min-w-[1100px] border-collapse text-left text-xs">
-              <thead className="sticky top-0 z-10 bg-[#176b5b] text-white">
-                <tr>
-                  {['Fecha', 'Tipo', 'Entidad', 'CLUES', 'Unidad', 'Usuario', 'Consultorio', 'Pregunta', 'Valor', 'Turno'].map((heading) => (
-                    <th key={heading} className="border-b border-[#0d4f43] px-3 py-3 font-bold uppercase">{heading}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#d9e5e1] text-[#17352f]">
-                {filteredRows.map((row) => (
-                  <tr key={row.id} className="odd:bg-white even:bg-[#f2f7f5] hover:bg-[#deeee9]">
-                    <td className="whitespace-nowrap px-3 py-2.5 text-[#607770]">{new Date(row.fecha_registro).toLocaleString('es-MX')}</td>
-                    <td className="px-3 py-2.5">{row.tipo_registro}</td>
-                    <td className="px-3 py-2.5">{row.entidad || '-'}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 font-mono font-semibold text-[#0f5b4d]">{row.clues_imb}</td>
-                    <td className="max-w-64 truncate px-3 py-2.5" title={row.nombre_de_la_unidad || ''}>{row.nombre_de_la_unidad || '-'}</td>
-                    <td className="px-3 py-2.5">{row.usuario_nombre || '-'}</td>
-                    <td className="px-3 py-2.5 text-center">{row.consultorio ?? '-'}</td>
-                    <td className="max-w-72 truncate px-3 py-2.5" title={row.pregunta || ''}>{row.pregunta || '-'}</td>
-                    <td className="px-3 py-2.5 text-center font-bold">{row.valor ?? '-'}</td>
-                    <td className="px-3 py-2.5">{row.turno || '-'}</td>
-                  </tr>
+          <section className="grid gap-5 lg:grid-cols-[1.35fr_0.65fr]">
+            <article className="rounded-lg border border-[#c8d9d4] bg-white p-4 shadow-sm sm:p-6">
+              <div className="mb-6 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold uppercase text-[#0f5b4d]">Distribución territorial</p>
+                  <h3 className="mt-1 text-lg font-bold text-[#17352f]">Unidades por entidad</h3>
+                </div>
+                <span className="rounded-full bg-[#e5f0ed] px-3 py-1 text-xs font-bold text-[#0f5b4d]">Top 7</span>
+              </div>
+              <div className="space-y-4">
+                {leadingEntities.map((entity) => (
+                  <div key={entity.id} className="grid grid-cols-[minmax(90px,160px)_1fr_45px] items-center gap-3">
+                    <span className="truncate text-xs font-semibold text-[#45645d]" title={entity.name}>{entity.name}</span>
+                    <div className="h-3 overflow-hidden rounded-full bg-[#e8f1ee]">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(entity.totalUnits / largestEntityTotal) * 100}%` }}
+                        transition={{ duration: 0.7, delay: 0.08 }}
+                        className="h-full rounded-full bg-[#176b5b]"
+                      />
+                    </div>
+                    <span className="text-right text-xs font-bold text-[#17352f]">{entity.totalUnits}</span>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-            {!isLoading && filteredRows.length === 0 && <p className="p-10 text-center text-[#607770]">No se encontraron registros.</p>}
-          </div>
+              </div>
+            </article>
+
+            <article className="rounded-lg border border-[#c8d9d4] bg-[#e8f1ee] p-4 shadow-sm sm:p-6">
+              <p className="text-xs font-bold uppercase text-[#0f5b4d]">Estado de captura</p>
+              <h3 className="mt-1 text-lg font-bold text-[#17352f]">Avance nacional</h3>
+              <div className="mx-auto my-7 grid h-40 w-40 place-items-center rounded-full" style={{ background: 'conic-gradient(#0f5b4d 0 84%, #c5d8d3 84% 100%)' }}>
+                <div className="grid h-28 w-28 place-items-center rounded-full bg-white text-center shadow-inner">
+                  <div>
+                    <p className="text-3xl font-extrabold text-[#17352f]">84%</p>
+                    <p className="text-[10px] font-bold uppercase text-[#607770]">Completado</p>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-center">
+                <div className="rounded-md bg-white p-3">
+                  <p className="text-lg font-bold text-[#0f5b4d]">3,327</p>
+                  <p className="text-[10px] uppercase text-[#607770]">Completadas</p>
+                </div>
+                <div className="rounded-md bg-white p-3">
+                  <p className="text-lg font-bold text-[#9b2247]">634</p>
+                  <p className="text-[10px] uppercase text-[#607770]">Pendientes</p>
+                </div>
+              </div>
+            </article>
+          </section>
+
+          <section className="mt-5 grid gap-5 lg:grid-cols-[1fr_0.72fr]">
+            <article className="rounded-lg border border-[#c8d9d4] bg-white p-4 shadow-sm sm:p-6">
+              <p className="text-xs font-bold uppercase text-[#9b2247]">Evolución semanal</p>
+              <div className="mt-1 flex items-end justify-between gap-4">
+                <h3 className="text-lg font-bold text-[#17352f]">Progreso de captura</h3>
+                <span className="text-sm font-bold text-[#0f5b4d]">+42 pts</span>
+              </div>
+              <div className="mt-6 flex h-44 items-end gap-3 border-b border-[#c8d9d4] px-2">
+                {monthlyProgress.map((value, index) => (
+                  <div key={value + index} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
+                    <span className="text-[10px] font-bold text-[#45645d]">{value}%</span>
+                    <motion.div initial={{ height: 0 }} animate={{ height: `${value}%` }} transition={{ duration: 0.6, delay: index * 0.06 }} className="w-full max-w-12 rounded-t-md bg-[#a57f2c]" />
+                    <span className="pb-2 text-[10px] text-[#607770]">S{index + 1}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="rounded-lg bg-[#0f5b4d] p-5 text-white shadow-sm sm:p-6">
+              <p className="text-xs font-bold uppercase text-[#f0d68a]">Resumen operativo</p>
+              <h3 className="mt-1 text-lg font-bold">Situación actual</h3>
+              <div className="mt-6 space-y-5">
+                {[
+                  { label: 'Con conexión', value: 91, color: '#f0d68a' },
+                  { label: 'Captura validada', value: 84, color: '#ffffff' },
+                  { label: 'Unidades en revisión', value: 16, color: '#d9819c' },
+                ].map((item) => (
+                  <div key={item.label}>
+                    <div className="mb-2 flex justify-between text-xs"><span>{item.label}</span><strong>{item.value}%</strong></div>
+                    <div className="h-2 overflow-hidden rounded-full bg-black/20">
+                      <div className="h-full rounded-full" style={{ width: `${item.value}%`, backgroundColor: item.color }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </section>
+
+          <p className="py-5 text-center text-[11px] text-[#6d837d]">
+            Tablero inicial de referencia. Las métricas de avance se conectarán a la fuente definitiva.
+          </p>
         </div>
       )}
     </div>
