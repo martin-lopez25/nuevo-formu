@@ -25,9 +25,6 @@ function pagesIndexPlugin() {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const productionApiUrl = mode === 'production' && env.SUPABASE_URL
-    ? `${env.SUPABASE_URL.replace(/\/$/, '')}/functions/v1/admin-api`
-    : '';
 
   return {
     base: '/nuevo-formu/',
@@ -35,7 +32,7 @@ export default defineConfig(({ mode }) => {
     define: {
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.SUPABASE_URL || ''),
       'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.SUPABASE_ANON_KEY || ''),
-      'import.meta.env.VITE_API_URL': JSON.stringify(env.API_URL || productionApiUrl),
+      'import.meta.env.VITE_API_URL': JSON.stringify(env.API_URL || ''),
     },
     build: {
       outDir: '.',

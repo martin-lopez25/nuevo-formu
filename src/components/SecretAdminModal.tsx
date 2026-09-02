@@ -1,7 +1,6 @@
-import React, { FormEvent, useState } from 'react';
+import React from 'react';
 import { motion } from 'motion/react';
-import { Activity, Building2, CheckCircle, Eye, EyeOff, LogOut, MapPinned, ShieldCheck, Stethoscope, TrendingUp, User, X } from 'lucide-react';
-import { authenticateAdmin, logoutAdmin } from '../services/api.ts';
+import { Activity, Building2, LogOut, MapPinned, Stethoscope, TrendingUp, X } from 'lucide-react';
 import entities from '../data/entities.json';
 
 interface SecretAdminModalProps {
@@ -9,7 +8,6 @@ interface SecretAdminModalProps {
   onClose: () => void;
 }
 
-const USER_BACKGROUND = `${import.meta.env.BASE_URL}imagenes/usuario.jpg`;
 const totalUnits = entities.reduce((total, entity) => total + entity.totalUnits, 0);
 const leadingEntities = [...entities]
   .sort((first, second) => second.totalUnits - first.totalUnits)
@@ -18,109 +16,11 @@ const largestEntityTotal = leadingEntities[0]?.totalUnits || 1;
 const monthlyProgress = [42, 51, 48, 63, 71, 78, 84];
 
 export const SecretAdminModal: React.FC<SecretAdminModalProps> = ({ isOpen, onClose }) => {
-  const [adminToken, setAdminToken] = useState<string | null>(null);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loginError, setLoginError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-
   if (!isOpen) return null;
-
-  const handleLogin = async (event: FormEvent) => {
-    event.preventDefault();
-    setIsLoading(true);
-    setLoginError('');
-    try {
-      const token = await authenticateAdmin(username, password);
-      setAdminToken(token);
-      setLoginError('');
-      setUsername('');
-      setPassword('');
-    } catch (error) {
-      setLoginError(error instanceof Error ? error.message : 'No fue posible iniciar sesión');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const leaveAdmin = async () => {
-    const token = adminToken;
-    setAdminToken(null);
-    setUsername('');
-    setPassword('');
-    setLoginError('');
-    onClose();
-    if (token) {
-      try {
-        await logoutAdmin(token);
-      } catch (_) {}
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-[100] bg-[#f5f7f5] text-[#17352f]" role="dialog" aria-modal="true" aria-label="Administración">
-      {!adminToken ? (
-        <div
-          className="relative min-h-full flex items-center justify-center overflow-hidden bg-white bg-cover bg-center p-4"
-          style={{ backgroundImage: `url(${USER_BACKGROUND})` }}
-        >
-          <div className="absolute inset-0 bg-white/20" aria-hidden="true" />
-          <motion.form
-            onSubmit={handleLogin}
-            initial={{ opacity: 0, scale: 0.92, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="relative z-10 w-full max-w-md rounded-3xl border border-white/25 bg-gradient-to-b from-[#9B2247]/95 via-[#611232]/95 to-[#27101b]/95 p-6 text-white shadow-[0_25px_60px_rgba(0,0,0,0.6)] sm:p-8"
-          >
-            <button type="button" onClick={() => void leaveAdmin()} className="absolute right-4 top-4 rounded-full border border-white/15 bg-white/10 p-1.5 text-white/60 transition-colors hover:bg-white/20 hover:text-white" aria-label="Cerrar modal">
-              <X className="h-4 w-4" />
-            </button>
-
-            <div className="mb-6 text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/20 bg-white/10 shadow-inner">
-                <ShieldCheck className="h-6 w-6 text-[#A57F2C]" />
-              </div>
-              <span className="block text-xs font-bold uppercase tracking-widest text-amber-200">Acceso restringido</span>
-              <h2 className="mt-1 text-xl font-extrabold text-white sm:text-2xl">Panel administrativo</h2>
-            </div>
-
-            <label className="mb-4 block text-xs font-semibold text-rose-100">
-              <span className="mb-1.5 flex items-center gap-1.5"><User className="h-3.5 w-3.5 text-[#A57F2C]" />Usuario</span>
-              <input
-                autoFocus
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                className="w-full rounded-xl border border-white/20 bg-black/30 px-4 py-2.5 text-sm text-white outline-none placeholder-white/40 focus:border-amber-300 focus:ring-2 focus:ring-amber-400/40"
-                autoComplete="username"
-                required
-              />
-            </label>
-            <label className="block text-xs font-semibold text-rose-100">
-              <span className="mb-1.5 flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-[#A57F2C]" />Contraseña</span>
-              <span className="relative block">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="w-full rounded-xl border border-white/20 bg-black/30 px-4 py-2.5 pr-11 text-sm text-white outline-none focus:border-amber-300 focus:ring-2 focus:ring-amber-400/40"
-                  autoComplete="current-password"
-                  required
-                />
-                <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-white/60 hover:text-white" title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
-              </span>
-            </label>
-            {loginError && <p className="mt-3 text-xs font-medium text-amber-300" role="alert">{loginError}</p>}
-            <button type="submit" disabled={isLoading} className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[#A57F2C] px-4 py-3 text-sm font-bold text-black shadow-lg transition-colors hover:bg-[#b88f33] disabled:opacity-60">
-              <span>{isLoading ? 'VALIDANDO...' : 'INGRESAR'}</span>
-              {!isLoading && <CheckCircle className="h-4 w-4" />}
-            </button>
-          </motion.form>
-        </div>
-      ) : (
-        <div className="mx-auto h-screen max-w-[1500px] overflow-y-auto p-4 sm:p-6">
+      <div className="mx-auto h-screen max-w-[1500px] overflow-y-auto p-4 sm:p-6">
           <header className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-lg bg-[#0f5b4d] p-4 text-white shadow-md sm:p-5">
             <div className="flex items-center gap-3">
               <Activity className="h-7 w-7 text-[#f0d68a]" />
@@ -130,10 +30,10 @@ export const SecretAdminModal: React.FC<SecretAdminModalProps> = ({ isOpen, onCl
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => void leaveAdmin()} className="p-2.5 text-emerald-50 hover:bg-white/15 hover:text-white" title="Cerrar sesión">
+              <button onClick={onClose} className="p-2.5 text-emerald-50 hover:bg-white/15 hover:text-white" title="Salir del tablero">
                 <LogOut className="h-5 w-5" />
               </button>
-              <button onClick={() => void leaveAdmin()} className="p-2.5 text-emerald-50 hover:bg-white/15 hover:text-white" title="Cerrar panel">
+              <button onClick={onClose} className="p-2.5 text-emerald-50 hover:bg-white/15 hover:text-white" title="Cerrar panel">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -251,8 +151,7 @@ export const SecretAdminModal: React.FC<SecretAdminModalProps> = ({ isOpen, onCl
           <p className="py-5 text-center text-[11px] text-[#6d837d]">
             Tablero inicial de referencia. Las métricas de avance se conectarán a la fuente definitiva.
           </p>
-        </div>
-      )}
+      </div>
     </div>
   );
 };
