@@ -84,8 +84,16 @@ async function readApiResponse(response: Response) {
   return response.json();
 }
 
+async function fetchAdminApi(input: string, init?: RequestInit) {
+  try {
+    return await fetch(input, init);
+  } catch {
+    throw new Error('La API administrativa aún no está desplegada o no se puede conectar.');
+  }
+}
+
 export async function authenticateAdmin(username: string, password: string): Promise<string> {
-  const response = await fetch(`${API_BASE}/admin/login/`, {
+  const response = await fetchAdminApi(`${API_BASE}/admin/login/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password })
@@ -98,14 +106,14 @@ export async function authenticateAdmin(username: string, password: string): Pro
 }
 
 export async function logoutAdmin(token: string): Promise<void> {
-  await fetch(`${API_BASE}/admin/logout/`, {
+  await fetchAdminApi(`${API_BASE}/admin/logout/`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` }
   });
 }
 
 export async function fetchAdminResponses(token: string): Promise<AdminResponseRow[]> {
-  const response = await fetch(`${API_BASE}/admin/respuestas/`, {
+  const response = await fetchAdminApi(`${API_BASE}/admin/respuestas/`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   const json = await readApiResponse(response);
