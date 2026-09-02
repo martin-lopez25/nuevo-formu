@@ -5,6 +5,16 @@ const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '') + '/api
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+const adminAuth = supabaseUrl && supabaseAnonKey
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+        storageKey: 'imss-admin-auth'
+      }
+    })
+  : null;
 
 function requireSupabase() {
   if (!supabase) throw new Error('Supabase no está configurado');
@@ -76,6 +86,12 @@ export interface AdminResponseRow {
   turno: string | null;
 }
 
+async function adminPassword(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 async function readApiResponse(response: Response) {
   const contentType = response.headers.get('content-type') || '';
   if (!contentType.includes('application/json')) {
@@ -93,23 +109,21 @@ async function fetchAdminApi(input: string, init?: RequestInit) {
 }
 
 export async function authenticateAdmin(username: string, password: string): Promise<string> {
-  const response = await fetchAdminApi(`${API_BASE}/admin/login/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
+  if (!adminAuth) throw new Error('El servicio de acceso no está configurado');
+  const normalizedUsername = username.trim().toLowerCase();
+  const { data, error } = await adminAuth.auth.signInWithPassword({
+    email: `${normalizedUsername}@admin.example.com`,
+    password: await adminPassword(password)
   });
-  const json = await readApiResponse(response);
-  if (!response.ok || !json.success || !json.token) {
-    throw new Error(json.message || 'No fue posible iniciar sesión');
+  if (error || !data.session?.access_token) {
+    throw new Error('Usuario o contraseña incorrectos');
   }
-  return json.token;
+  return data.session.access_token;
 }
 
 export async function logoutAdmin(token: string): Promise<void> {
-  await fetchAdminApi(`${API_BASE}/admin/logout/`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` }
-  });
+  if (!token || !adminAuth) return;
+  await adminAuth.auth.signOut({ scope: 'local' });
 }
 
 export async function fetchAdminResponses(token: string): Promise<AdminResponseRow[]> {
