@@ -54,8 +54,9 @@ const adminSessions = new Map<string, number>();
 const ADMIN_SESSION_DURATION_MS = 30 * 60 * 1000;
 
 function credentialsMatch(username: string, password: string) {
-  const expectedUsername = process.env.ADMIN_USERNAME || 'add.31';
-  const expectedPassword = process.env.ADMIN_PASSWORD || '3180';
+  const expectedUsername = process.env.ADMIN_USERNAME;
+  const expectedPassword = process.env.ADMIN_PASSWORD;
+  if (!expectedUsername || !expectedPassword) return false;
   const provided = Buffer.from(`${username}\0${password}`);
   const expected = Buffer.from(`${expectedUsername}\0${expectedPassword}`);
   return provided.length === expected.length && timingSafeEqual(provided, expected);
