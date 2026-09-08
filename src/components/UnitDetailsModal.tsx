@@ -80,8 +80,18 @@ export const UnitDetailsModal: React.FC = () => {
             </div>
 
             <div className="p-3 rounded-xl bg-black/30 border border-white/10 space-y-1">
-              <span className="text-zinc-400 text-[10px] uppercase font-bold block">Consultorios Habilitados</span>
+              <span className="text-zinc-400 text-[10px] uppercase font-bold block">Consultorios de Medicina General Habilitados</span>
               <span className="font-mono text-sm font-bold text-emerald-400">{generalData.enabledOffices}</span>
+            </div>
+
+            <div className="p-3 rounded-xl bg-black/30 border border-white/10 space-y-1">
+              <span className="text-zinc-400 text-[10px] uppercase font-bold block">Consultorios temporalmente inhabilitados</span>
+              <span className="font-mono text-sm font-bold text-rose-400">{generalData.unoperatedOffices}</span>
+            </div>
+
+            <div className="p-3 rounded-xl bg-black/30 border border-white/10 space-y-1 sm:col-span-2">
+              <span className="text-zinc-400 text-[10px] uppercase font-bold block">Total de Consultorios de Medicina General</span>
+              <span className="font-mono text-sm font-bold text-amber-300">{generalData.totalGeneralOffices}</span>
             </div>
 
             <div className="p-3 rounded-xl bg-black/30 border border-white/10 space-y-1 sm:col-span-2">

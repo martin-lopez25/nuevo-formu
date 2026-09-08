@@ -18,7 +18,14 @@ export interface MedicalUnit {
   lastUpdated?: string;
 }
 
-export type TurnType = 'Matutino' | 'Vespertino' | 'Ambos' | '';
+export type TurnType =
+  | 'Matutino'
+  | 'Matutino lunes a viernes'
+  | 'Matutino miércoles a domingo'
+  | 'Matutino sábados y domingos (fin de semana)'
+  | 'Vespertino'
+  | 'Ambos'
+  | '';
 
 export interface QuestionAnswer {
   id?: string;
@@ -38,9 +45,11 @@ export interface UnitGeneralData {
   entidad?: string;
   usuarioNombre?: string;
   hasInternet: 'SI' | 'NO' | 'PENDIENTE';
-  enabledOffices: number;
-  unoperatedOffices: number;
-  configuredOffices: number;
+  hasTemporarilyClosedOffices: 'SI' | 'NO' | 'PENDIENTE';
+  enabledOffices: number | null;
+  unoperatedOffices: number | null;
+  totalGeneralOffices: number | null;
+  configuredOffices: number | null;
   turns: Record<number, TurnType>; // officeNumber -> TurnType
   updatedAt: string;
 }

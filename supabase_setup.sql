@@ -10,6 +10,9 @@ create table if not exists public.respuestas (
   categoria_gerencial_ampliada text,
   internet text check (internet in ('SI', 'NO', 'PENDIENTE')),
   consultorios_habilitados integer check (consultorios_habilitados >= 0),
+  tiene_consultorios_inoperantes text check (tiene_consultorios_inoperantes in ('SI', 'NO', 'PENDIENTE')),
+  consultorios_inhabilitados integer check (consultorios_inhabilitados >= 0),
+  total_consultorios_medicina_general integer check (total_consultorios_medicina_general >= 0),
   consultorio integer,
   pregunta text,
   valor integer check (valor is null or valor >= 0),
@@ -17,7 +20,40 @@ create table if not exists public.respuestas (
 );
 
 alter table public.respuestas
-  drop constraint if exists respuestas_tipo_datos_check;
+  add column if not exists tiene_consultorios_inoperantes text
+    check (tiene_consultorios_inoperantes in ('SI', 'NO', 'PENDIENTE')),
+  add column if not exists consultorios_inhabilitados integer
+    check (consultorios_inhabilitados >= 0),
+  add column if not exists total_consultorios_medicina_general integer
+    check (total_consultorios_medicina_general >= 0);
+
+alter table public.respuestas
+  drop constraint if exists respuestas_tipo_datos_check,
+  drop constraint if exists respuestas_condicion_funcionamiento_check;
+
+delete from public.respuestas
+where tipo_registro = 'respuesta'
+  and pregunta <> 'consultorios'
+  and valor is null;
+
+alter table public.respuestas
+  drop column if exists condicion_funcionamiento;
+
+alter table public.respuestas
+  drop constraint if exists respuestas_turno_check;
+
+alter table public.respuestas
+  add constraint respuestas_turno_check check (
+    turno is null or turno in (
+      '',
+      'Matutino',
+      'Matutino lunes a viernes',
+      'Matutino miércoles a domingo',
+      'Matutino sábados y domingos (fin de semana)',
+      'Vespertino',
+      'Ambos'
+    )
+  );
 
 update public.respuestas
 set consultorio = valor,
@@ -35,7 +71,14 @@ alter table public.respuestas
     or
     (tipo_registro = 'respuesta' and consultorio is not null
       and ((pregunta = 'consultorios' and consultorio between 0 and 20) or (pregunta <> 'consultorios' and consultorio > 0))
-      and pregunta is not null and internet is null and consultorios_habilitados is null)
+        and pregunta is not null
+        and internet is null
+        and consultorios_habilitados is null
+        and tiene_consultorios_inoperantes is null
+        and consultorios_inhabilitados is null
+        and total_consultorios_medicina_general is null
+        and ((pregunta = 'consultorios' and valor is null)
+          or (pregunta <> 'consultorios' and valor is not null)))
   );
 
 create unique index if not exists respuestas_unidad_clues_uidx

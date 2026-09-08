@@ -100,7 +100,7 @@ export const Section2InstructionsVisuals: React.FC = () => {
                 7. Guardado Automático
               </h4>
               <p className="text-xs text-black leading-relaxed">
-                El turno se guarda automáticamente al hacer clic en Matutino, Vespertino o Ambos. Cada pregunta se guarda automáticamente al presionar Enter en el teclado o al salir de la celda.
+                El turno se guarda automáticamente al seleccionar el horario correspondiente. Cada pregunta se guarda automáticamente al presionar Enter en el teclado o al salir de la celda.
               </p>
             </div>
             <div className="p-4 rounded-2xl bg-white/35 border border-black/15 backdrop-blur-sm shadow-sm">

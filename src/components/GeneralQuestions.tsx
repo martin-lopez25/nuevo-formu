@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext.tsx';
 import { Wifi, Users, AlertCircle, CheckCircle2, Sliders, ChevronDown, ListFilter } from 'lucide-react';
 import { EQUIPMENT_CATALOG } from '../data/equipmentCatalog.ts';
+import { NumericStepper } from './NumericStepper.tsx';
 
 interface GeneralQuestionsProps {
   onScrollToQuestion?: (questionName: string) => void;
@@ -12,25 +13,27 @@ export const GeneralQuestions: React.FC<GeneralQuestionsProps> = ({ onScrollToQu
     selectedUnit,
     generalData,
     handleSetInternet,
-    handleSetEnabledOffices,
+    handleSetGeneralOfficeAvailability,
     handleConfigureOffices,
     stats,
     answers
   } = useApp();
 
-  const [officeCountInput, setOfficeCountInput] = useState<number>(generalData.configuredOffices ?? 1);
-  const [enabledInput, setEnabledInput] = useState<number>(generalData.enabledOffices ?? 1);
+  const [officeCountInput, setOfficeCountInput] = useState(generalData.configuredOffices === null ? '' : String(generalData.configuredOffices));
+  const [enabledInput, setEnabledInput] = useState(generalData.enabledOffices === null ? '' : String(generalData.enabledOffices));
+  const [unoperatedInput, setUnoperatedInput] = useState(generalData.unoperatedOffices === null ? '' : String(generalData.unoperatedOffices));
 
   useEffect(() => {
-    setOfficeCountInput(generalData.configuredOffices ?? 1);
-    setEnabledInput(generalData.enabledOffices ?? 1);
-  }, [generalData.configuredOffices, generalData.enabledOffices]);
+    setOfficeCountInput(generalData.configuredOffices === null ? '' : String(generalData.configuredOffices));
+    setEnabledInput(generalData.enabledOffices === null ? '' : String(generalData.enabledOffices));
+    setUnoperatedInput(generalData.unoperatedOffices === null ? '' : String(generalData.unoperatedOffices));
+  }, [generalData.configuredOffices, generalData.enabledOffices, generalData.unoperatedOffices]);
 
   if (!selectedUnit) return null;
 
   // Find all missing questions across all configured offices
   const missingQuestionsList: { office: number; question: string }[] = [];
-  for (let c = 1; c <= generalData.configuredOffices; c++) {
+  for (let c = 1; c <= (generalData.configuredOffices ?? 0); c++) {
     EQUIPMENT_CATALOG.forEach((q) => {
       const ans = answers[`${c}__${q.name}`];
       if (!ans || ans.value === null || ans.value === undefined) {
@@ -41,12 +44,29 @@ export const GeneralQuestions: React.FC<GeneralQuestionsProps> = ({ onScrollToQu
 
   const handleApplyOfficeCount = (e: React.FormEvent) => {
     e.preventDefault();
+    if (officeCountInput === '') return;
     handleConfigureOffices(Number(officeCountInput));
   };
 
-  const handleEnabledBlur = () => {
-    handleSetEnabledOffices(Number(enabledInput));
+  const saveOfficeAvailability = (enabled = enabledInput, unoperated = unoperatedInput) => {
+    if (generalData.hasTemporarilyClosedOffices === 'PENDIENTE') return;
+    handleSetGeneralOfficeAvailability(
+      generalData.hasTemporarilyClosedOffices,
+      enabled === '' ? null : Number(enabled),
+      unoperated === '' ? null : Number(unoperated)
+    );
   };
+
+  const selectOfficeAvailability = (option: 'SI' | 'NO') => {
+    setEnabledInput('');
+    setUnoperatedInput('');
+    handleSetGeneralOfficeAvailability(option, null, option === 'NO' ? 0 : null);
+  };
+
+  const totalInput = enabledInput !== ''
+    && (generalData.hasTemporarilyClosedOffices === 'NO' || unoperatedInput !== '')
+      ? Number(enabledInput) + (generalData.hasTemporarilyClosedOffices === 'SI' ? Number(unoperatedInput) : 0)
+      : '';
 
   return (
     <div className="w-full space-y-4">
@@ -88,27 +108,69 @@ export const GeneralQuestions: React.FC<GeneralQuestionsProps> = ({ onScrollToQu
             </div>
           </div>
 
-          {/* Question 2: Consultorios Generales Habilitados */}
+          {/* Question 2: Consultorios de Medicina General */}
           <div className="p-3 rounded-xl bg-black/30 border border-white/10 flex flex-col justify-between space-y-2">
-            <label htmlFor="enabled-offices-input" className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
+            <div className="text-xs font-semibold text-zinc-200 flex items-start gap-1.5">
               <Users className="w-3.5 h-3.5 text-[#A57F2C]" />
-              Consultorios Generales Habilitados:
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                id="enabled-offices-input"
-                type="number"
-                min="0"
-                max="50"
-                value={enabledInput}
-                onChange={(e) => setEnabledInput(Number(e.target.value))}
-                onFocus={(e) => e.currentTarget.select()}
-                onBlur={handleEnabledBlur}
-                onKeyDown={(e) => e.key === 'Enter' && handleEnabledBlur()}
-                className="w-20 px-3 py-1.5 rounded-lg bg-black/40 border border-white/20 text-white font-bold text-center text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-              />
-              <span className="text-xs text-zinc-300 font-medium">habilitados</span>
+              <span>¿Tiene consultorios que no operan temporalmente por falta de personal u otra causa?</span>
             </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {(['SI', 'NO'] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => selectOfficeAvailability(option)}
+                  className={`py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    generalData.hasTemporarilyClosedOffices === option
+                      ? option === 'SI'
+                        ? 'bg-emerald-600 text-white shadow-md'
+                        : 'bg-rose-700 text-white shadow-md'
+                      : 'bg-white/10 hover:bg-white/20 text-zinc-300'
+                  }`}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+            {generalData.hasTemporarilyClosedOffices !== 'PENDIENTE' && (
+              <div className={`grid gap-2 ${generalData.hasTemporarilyClosedOffices === 'SI' ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                <label className="text-[11px] text-zinc-300">
+                  Habilitados
+                  <NumericStepper
+                    id="enabled-offices-input"
+                    min="0"
+                    max="50"
+                    value={enabledInput}
+                    onChange={setEnabledInput}
+                    onCommit={(value) => saveOfficeAvailability(value, unoperatedInput)}
+                    onBlur={() => saveOfficeAvailability()}
+                    onEnter={() => saveOfficeAvailability()}
+                    inputClassName="px-1 py-1.5 text-sm font-bold text-white"
+                  />
+                </label>
+                {generalData.hasTemporarilyClosedOffices === 'SI' && (
+                  <label className="text-[11px] text-zinc-300">
+                    Inhabilitados
+                    <NumericStepper
+                      min="0"
+                      max="50"
+                      value={unoperatedInput}
+                      onChange={setUnoperatedInput}
+                      onCommit={(value) => saveOfficeAvailability(enabledInput, value)}
+                      onBlur={() => saveOfficeAvailability()}
+                      onEnter={() => saveOfficeAvailability()}
+                      inputClassName="px-1 py-1.5 text-sm font-bold text-white"
+                    />
+                  </label>
+                )}
+                <div className="text-[11px] text-zinc-300">
+                  Total
+                  <div className="mt-1 px-2 py-1.5 rounded-lg bg-white/10 border border-white/15 text-amber-300 font-bold text-center text-sm">
+                    {totalInput}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
         </div>
@@ -117,21 +179,20 @@ export const GeneralQuestions: React.FC<GeneralQuestionsProps> = ({ onScrollToQu
         <form onSubmit={handleApplyOfficeCount} className="pt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <label htmlFor="office-count-to-capture" className="text-xs font-semibold text-emerald-200">
-              Número de consultorios que se capturarán (0 - 20):
+              Número de consultorios que se capturarán para el informe SUS:
             </label>
-            <input
+            <NumericStepper
               id="office-count-to-capture"
-              type="number"
               min="0"
               max="20"
               value={officeCountInput}
-              onChange={(e) => setOfficeCountInput(Number(e.target.value))}
-              onFocus={(e) => e.currentTarget.select()}
-              className="w-20 px-3 py-1.5 rounded-lg bg-black/50 border border-[#A57F2C]/60 text-white font-bold text-center text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+              onChange={setOfficeCountInput}
+              inputClassName="w-10 px-1 py-1.5 text-sm font-bold text-white"
             />
             <button
               type="submit"
-              className="px-4 py-1.5 rounded-lg bg-[#A57F2C] hover:bg-[#b88f33] text-black font-bold text-xs shadow-md transition-all uppercase"
+              disabled={officeCountInput === ''}
+              className="px-4 py-1.5 rounded-lg bg-[#A57F2C] hover:bg-[#b88f33] text-black font-bold text-xs shadow-md transition-all uppercase disabled:cursor-not-allowed disabled:opacity-40"
               id="btn-aplicar-consultorios"
             >
               APLICAR
@@ -139,8 +200,8 @@ export const GeneralQuestions: React.FC<GeneralQuestionsProps> = ({ onScrollToQu
           </div>
 
           <div className="flex items-center gap-3 text-xs text-zinc-300 font-mono">
-            <span>Consultorios configurados: <strong className="text-amber-300">{generalData.configuredOffices}</strong></span>
-            <span>Último consultorio: <strong className="text-amber-300">{generalData.configuredOffices}</strong></span>
+            <span>Consultorios configurados: <strong className="text-amber-300">{generalData.configuredOffices ?? ''}</strong></span>
+            <span>Último consultorio: <strong className="text-amber-300">{generalData.configuredOffices ?? ''}</strong></span>
           </div>
         </form>
       </div>

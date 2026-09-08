@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext.tsx';
 import { EQUIPMENT_CATALOG } from '../data/equipmentCatalog.ts';
 import { QuestionCell } from './QuestionCell.tsx';
 import { TurnType } from '../types.ts';
-import { Sun, Moon, Sunrise, CheckCircle2 } from 'lucide-react';
+import { Sunrise, CheckCircle2 } from 'lucide-react';
 
 interface QuestionnaireTableProps {
   tableContainerRef?: React.RefObject<HTMLDivElement>;
@@ -16,7 +16,7 @@ export const QuestionnaireTable: React.FC<QuestionnaireTableProps> = ({ tableCon
     handleSetTurn
   } = useApp();
 
-  const officesCount = generalData.configuredOffices;
+  const officesCount = generalData.configuredOffices ?? 0;
   const officesList = Array.from({ length: officesCount }, (_, i) => i + 1);
 
   if (officesCount === 0) {
@@ -33,7 +33,14 @@ export const QuestionnaireTable: React.FC<QuestionnaireTableProps> = ({ tableCon
   }
 
   // Turn options
-  const turnOptions: TurnType[] = ['Matutino', 'Vespertino', 'Ambos'];
+  const turnOptions: TurnType[] = [
+    'Matutino',
+    'Matutino lunes a viernes',
+    'Matutino miércoles a domingo',
+    'Matutino sábados y domingos (fin de semana)',
+    'Vespertino',
+    'Ambos'
+  ];
 
   return (
     <div className="w-full rounded-3xl backdrop-blur-md bg-transparent border border-white/25 shadow-[0_25px_60px_rgba(0,0,0,0.5)] overflow-hidden text-white">
@@ -50,6 +57,10 @@ export const QuestionnaireTable: React.FC<QuestionnaireTableProps> = ({ tableCon
         <div className="text-xs text-amber-300/90 font-mono hidden sm:block">
           {officesCount} Consultorio(s) configurado(s)
         </div>
+      </div>
+
+      <div className="border-b border-amber-400/30 bg-amber-950/45 px-4 py-3 text-[11px] leading-relaxed text-amber-100">
+        <strong className="text-amber-300">Criterio de contabilización:</strong> únicamente se contabilizan los bienes cuya existencia se encuentre en condiciones óptimas de funcionamiento, a fin de que la cantidad reportada corresponda al equipamiento efectivamente disponible para la operación. Los bienes fuera de funcionamiento no deben incluirse, para evitar sobreestimar la disponibilidad y sesgar la determinación de las necesidades de adquisición.
       </div>
 
       {/* Responsive Horizontal Scroll Container */}
@@ -86,23 +97,16 @@ export const QuestionnaireTable: React.FC<QuestionnaireTableProps> = ({ tableCon
                 const currentTurn = generalData.turns[cNum] || 'Matutino';
                 return (
                   <td key={`turn-${cNum}`} className="p-2 text-center border-r border-white/15 last:border-r-0">
-                    <div className="inline-flex rounded-full bg-[#1E5B4F]/60 p-1 border border-white/15 gap-1">
-                      {turnOptions.map((t) => (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => handleSetTurn(cNum, t)}
-                          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${
-                            currentTurn === t
-                              ? 'bg-[#A57F2C] text-black shadow-md font-bold'
-                              : 'text-zinc-300 hover:text-white hover:bg-white/10'
-                          }`}
-                          title={`Asignar turno ${t} a consultorio ${cNum}`}
-                        >
-                          {t}
-                        </button>
+                    <select
+                      value={currentTurn}
+                      onChange={(event) => handleSetTurn(cNum, event.target.value as TurnType)}
+                      aria-label={`Turno del consultorio ${cNum}`}
+                      className="w-full min-w-[190px] rounded-lg border border-white/20 bg-[#1E5B4F] px-2 py-1.5 text-[11px] font-semibold text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    >
+                      {turnOptions.map((turn) => (
+                        <option key={turn} value={turn}>{turn}</option>
                       ))}
-                    </div>
+                    </select>
                   </td>
                 );
               })}
@@ -143,9 +147,6 @@ export const QuestionnaireTable: React.FC<QuestionnaireTableProps> = ({ tableCon
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-full bg-white/10 text-zinc-300 text-[10px] flex items-center justify-center flex-shrink-0 border border-white/10">
-                        {item.id}
-                      </span>
                       <span className="leading-snug">{item.name}</span>
                       {allAnsweredInRow && (
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 ml-auto" />

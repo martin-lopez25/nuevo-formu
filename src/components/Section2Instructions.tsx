@@ -101,7 +101,7 @@ export const Section2Instructions: React.FC = () => {
               <p className="text-xs text-black leading-relaxed">
                 Responda las preguntas que no dependen de consultorios:
                 <br />• <strong>Internet:</strong> Seleccione SI o NO.
-                <br />• <strong>Consultorios Generales Habilitados:</strong> Ingrese el número y presione Enter.
+                <br />• <strong>Consultorios de Medicina General:</strong> Indique si existen consultorios que no operan temporalmente. Capture los habilitados y, cuando corresponda, los inhabilitados; el total se calcula automáticamente.
               </p>
             </div>
 
@@ -112,7 +112,7 @@ export const Section2Instructions: React.FC = () => {
               </h3>
               <p className="text-xs text-black leading-relaxed">
                 Para cada consultorio complete:
-                <br />• <strong>Turno:</strong> Matutino, Vespertino o Ambos.
+                <br />• <strong>Turno:</strong> Seleccione el horario correspondiente, incluyendo las modalidades matutinas por días de operación.
                 <br />• <strong>Cantidad:</strong> Haga clic en la celda, ingrese el valor y presione Enter.
               </p>
             </div>

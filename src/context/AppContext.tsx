@@ -10,7 +10,6 @@ import {
 } from '../types.ts';
 import {
   saveLocalAnswer,
-  getLocalAnswersForUnit,
   saveLocalGeneralData,
   getLocalGeneralData,
   addToSyncQueue,
@@ -74,9 +73,13 @@ interface AppContextType {
   handleConfigureOffices: (count: number) => void;
   handleConfirmZeroOffices: () => Promise<void>;
   handleSetInternet: (status: 'SI' | 'NO' | 'PENDIENTE') => Promise<void>;
-  handleSetEnabledOffices: (val: number) => Promise<void>;
+  handleSetGeneralOfficeAvailability: (
+    status: 'SI' | 'NO',
+    enabledOffices: number | null,
+    unoperatedOffices: number | null
+  ) => Promise<void>;
   handleSetTurn: (officeNumber: number, turn: TurnType) => Promise<void>;
-  handleSaveAnswer: (officeNumber: number, question: string, value: number | null) => Promise<void>;
+  handleSaveAnswer: (officeNumber: number, question: string, value: number) => Promise<void>;
   setEditingCell: (key: string | null) => void;
   addToast: (title: string, type?: ToastMessage['type'], description?: string) => void;
   removeToast: (id: string) => void;
@@ -98,9 +101,11 @@ interface AppContextType {
 const defaultGeneralData: UnitGeneralData = {
   clues: '',
   hasInternet: 'PENDIENTE',
-  enabledOffices: 1,
-  unoperatedOffices: 0,
-  configuredOffices: 1,
+  hasTemporarilyClosedOffices: 'PENDIENTE',
+  enabledOffices: null,
+  unoperatedOffices: null,
+  totalGeneralOffices: null,
+  configuredOffices: null,
   turns: { 1: 'Matutino' },
   updatedAt: new Date().toISOString()
 };
@@ -247,17 +252,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (draft.selectedUnit) {
             setSelectedUnit(draft.selectedUnit);
             setIsUnitLocked(draft.isUnitLocked ?? true);
-            const localAns = await getLocalAnswersForUnit(draft.selectedUnit.clues);
             const gen = await getLocalGeneralData(draft.selectedUnit.clues);
             const serverRes = await fetchUnitResponses(draft.selectedUnit.clues);
 
-            Object.entries(serverRes.answers).forEach(([key, serverAnswer]) => {
-              if (!localAns[key] || localAns[key].status === 'saved_cloud') {
-                localAns[key] = serverAnswer;
-              }
-            });
-
-            setAnswers(localAns);
+            setAnswers(serverRes.answers || {});
             if (gen || serverRes.general) {
               setGeneralData({
                 ...defaultGeneralData,
@@ -311,18 +309,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     addToast('Cargando información de la unidad...', 'info', unit.name);
 
-    // 1. Check local IndexedDB first
-    const localAnswers = await getLocalAnswersForUnit(unit.clues);
+    // Local answers are only a synchronization safeguard; the form reflects the server.
     const localGeneral = await getLocalGeneralData(unit.clues);
+    let serverAnswers: Record<string, QuestionAnswer> = {};
 
     let mergedGeneral: UnitGeneralData = {
       clues: unit.clues,
       entidad: selectedEntity || unit.entity,
       usuarioNombre: user?.name || '',
       hasInternet: unit.hasInternet || 'PENDIENTE',
-      enabledOffices: unit.enabledOffices ?? 1,
-      unoperatedOffices: unit.unoperatedOffices ?? 0,
-      configuredOffices: unit.totalOffices ?? unit.enabledOffices ?? 1,
+      hasTemporarilyClosedOffices: 'PENDIENTE',
+      enabledOffices: unit.enabledOffices ?? null,
+      unoperatedOffices: unit.unoperatedOffices ?? null,
+      totalGeneralOffices: unit.enabledOffices === undefined
+        ? null
+        : unit.enabledOffices + (unit.unoperatedOffices ?? 0),
+      configuredOffices: unit.totalOffices ?? null,
       turns: { 1: 'Matutino' },
       updatedAt: new Date().toISOString()
     };
@@ -334,14 +336,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 2. Query server for previous answers and configurations
     try {
       const serverRes = await fetchUnitResponses(unit.clues);
-      if (serverRes.answers && Object.keys(serverRes.answers).length > 0) {
-        // Merge without overwriting unsynced local pending answers
-        Object.entries(serverRes.answers).forEach(([k, sAns]) => {
-          if (!localAnswers[k] || localAnswers[k].status === 'saved_cloud') {
-            localAnswers[k] = sAns;
-          }
-        });
-      }
+      serverAnswers = serverRes.answers || {};
       if (serverRes.general) {
         mergedGeneral = {
           ...mergedGeneral,
@@ -356,7 +351,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     setGeneralData(mergedGeneral);
-    setAnswers(localAnswers);
+  setAnswers(serverAnswers);
     await saveLocalGeneralData(mergedGeneral);
 
     saveAppDraft('current_session', {
@@ -472,25 +467,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [selectedUnit, selectedEntity, user, generalData, addToast, refreshPendingCount]);
 
-  const handleSetEnabledOffices = useCallback(async (val: number) => {
+  const handleSetGeneralOfficeAvailability = useCallback(async (
+    status: 'SI' | 'NO',
+    enabledOffices: number | null,
+    unoperatedOffices: number | null
+  ) => {
     if (!selectedUnit) return;
-    const safe = Math.max(0, Math.floor(val));
+    const safeEnabled = enabledOffices === null ? null : Math.max(0, Math.floor(enabledOffices));
+    const safeUnoperated = status === 'SI'
+      ? unoperatedOffices === null ? null : Math.max(0, Math.floor(unoperatedOffices))
+      : 0;
+    const totalGeneralOffices = safeEnabled === null || safeUnoperated === null
+      ? null
+      : safeEnabled + safeUnoperated;
     const updated: UnitGeneralData = {
       ...generalData,
       entidad: selectedEntity || selectedUnit.entity || generalData.entidad,
       usuarioNombre: user?.name || generalData.usuarioNombre || '',
-      enabledOffices: safe,
+      hasTemporarilyClosedOffices: status,
+      enabledOffices: safeEnabled,
+      unoperatedOffices: safeUnoperated,
+      totalGeneralOffices,
       updatedAt: new Date().toISOString()
     };
     setGeneralData(updated);
     await saveLocalGeneralData(updated);
     try {
       await saveUnitGeneral(selectedUnit.clues, updated);
-      addToast(`Consultorios habilitados guardados: ${safe}`, 'success');
+      addToast('Disponibilidad de consultorios guardada', 'success');
     } catch {
       await addToSyncQueue({ action: 'save_general', clues: selectedUnit.clues, payload: updated });
       refreshPendingCount();
-      addToast('Consultorios habilitados guardados localmente', 'warning', 'Se sincronizarán al reconectar.');
+      addToast('Disponibilidad guardada localmente', 'warning', 'Se sincronizará al reconectar.');
     }
   }, [selectedUnit, selectedEntity, user, generalData, addToast, refreshPendingCount]);
 
@@ -532,7 +540,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [selectedUnit, selectedEntity, user, generalData, answers, addToast, refreshPendingCount]);
 
   // Save Single Cell Answer (Enter key or Save button)
-  const handleSaveAnswer = useCallback(async (officeNumber: number, question: string, value: number | null) => {
+  const handleSaveAnswer = useCallback(async (officeNumber: number, question: string, value: number) => {
     if (!selectedUnit || !user || !selectedEntity) return;
 
     const cellKey = `${officeNumber}__${question}`;
@@ -561,7 +569,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       clues: selectedUnit.clues,
       nombreUnidad: selectedUnit.name,
       categoria: selectedUnit.category || 'Sin categoría',
-      numeroConsultorios: generalData.configuredOffices,
+      numeroConsultorios: generalData.configuredOffices ?? 0,
       numeroConsultorio: officeNumber,
       pregunta: question,
       valor: value,
@@ -579,7 +587,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
         setAnswers((prev) => ({ ...prev, [cellKey]: cloudSaved }));
         await saveLocalAnswer(cloudSaved);
-        addToast('Respuesta guardada correctamente.', 'success', `${question} (C${officeNumber}) = ${value ?? 'PENDIENTE'}`);
+        addToast('Respuesta guardada correctamente.', 'success', `${question} (C${officeNumber}) = ${value}`);
       } else {
         throw new Error(res.message || 'Error del servidor');
       }
@@ -639,11 +647,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [user]);
 
   // Calculate Progress Stats
-  const totalQuestions = generalData.configuredOffices * EQUIPMENT_CATALOG.length;
+  const totalQuestions = (generalData.configuredOffices ?? 0) * EQUIPMENT_CATALOG.length;
   let answeredCount = 0;
   const officeProgress: Record<number, { percentage: number; missing: number; total: number }> = {};
 
-  for (let c = 1; c <= generalData.configuredOffices; c++) {
+  for (let c = 1; c <= (generalData.configuredOffices ?? 0); c++) {
     let cAnswered = 0;
     EQUIPMENT_CATALOG.forEach((q) => {
       const ans = answers[`${c}__${q.name}`];
@@ -698,7 +706,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         handleConfigureOffices,
         handleConfirmZeroOffices,
         handleSetInternet,
-        handleSetEnabledOffices,
+        handleSetGeneralOfficeAvailability,
         handleSetTurn,
         handleSaveAnswer,
         setEditingCell,

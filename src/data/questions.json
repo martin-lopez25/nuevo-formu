@@ -1,7 +1,31 @@
 [
   {
     "id": 1,
-    "name": "Equipo de cómputo"
+    "name": "Equipo de cómputo fijo"
+  },
+  {
+    "id": 45,
+    "name": "Laptop"
+  },
+  {
+    "id": 46,
+    "name": "Monitor"
+  },
+  {
+    "id": 47,
+    "name": "Teclado"
+  },
+  {
+    "id": 48,
+    "name": "Mouse"
+  },
+  {
+    "id": 49,
+    "name": "No Break"
+  },
+  {
+    "id": 50,
+    "name": "Impresora"
   },
   {
     "id": 2,
@@ -57,7 +81,7 @@
   },
   {
     "id": 15,
-    "name": "Cubeta de acero inoxidable y bolsa"
+    "name": "Cubeta de acero inoxidable / Porta cubeta rodable con protector de hule"
   },
   {
     "id": 16,
@@ -66,6 +90,14 @@
   {
     "id": 17,
     "name": "Esfigmomanómetro"
+  },
+  {
+    "id": 51,
+    "name": "Brazalete para adulto (Esfigmomanómetro)"
+  },
+  {
+    "id": 52,
+    "name": "Brazalete pediátrico (Esfigmomanómetro)"
   },
   {
     "id": 18,
@@ -117,19 +149,15 @@
   },
   {
     "id": 30,
-    "name": "Mesa universal para Exploración"
+    "name": "Mesa universal para exploración con pierneras"
   },
   {
     "id": 31,
-    "name": "Otoscopio"
+    "name": "Estuche de diagnóstico"
   },
   {
     "id": 32,
     "name": "Oximetro de pulso"
-  },
-  {
-    "id": 33,
-    "name": "Porta cubeta rodable con protector de hule"
   },
   {
     "id": 34,
@@ -145,7 +173,7 @@
   },
   {
     "id": 37,
-    "name": "Sillón giratorio de respaldo bajo"
+    "name": "Asiento para médico"
   },
   {
     "id": 38,
@@ -174,5 +202,57 @@
   {
     "id": 44,
     "name": "Vaso contenedor  de vacunas"
+  },
+  {
+    "id": 64,
+    "name": "Refrigerador para conservación y manejo de biológicos"
+  },
+  {
+    "id": 65,
+    "name": "Congelador para conservación y manejo de biológicos"
+  },
+  {
+    "id": 53,
+    "name": "Negatoscopio"
+  },
+  {
+    "id": 54,
+    "name": "Caja con tapa para soluciones desinfectantes"
+  },
+  {
+    "id": 55,
+    "name": "Mango para bisturí"
+  },
+  {
+    "id": 56,
+    "name": "Pinza de anillos"
+  },
+  {
+    "id": 57,
+    "name": "Pinza de disección con dientes"
+  },
+  {
+    "id": 58,
+    "name": "Pinza de disección sin dientes"
+  },
+  {
+    "id": 59,
+    "name": "Pinza tipo mosquito"
+  },
+  {
+    "id": 60,
+    "name": "Pinza para sujetar cuello de matriz"
+  },
+  {
+    "id": 61,
+    "name": "Pinza curva"
+  },
+  {
+    "id": 62,
+    "name": "Portaaguja recto, con ranura central y estrías cruzadas"
+  },
+  {
+    "id": 63,
+    "name": "Riñón de 250 ml o de mayor capacidad"
   }
 ]

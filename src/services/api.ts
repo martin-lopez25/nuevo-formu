@@ -32,6 +32,9 @@ function answerRow(payload: Parameters<typeof saveSingleAnswer>[0]) {
     nombre_de_la_unidad: payload.nombreUnidad,
     internet: null,
     consultorios_habilitados: null,
+    tiene_consultorios_inoperantes: null,
+    consultorios_inhabilitados: null,
+    total_consultorios_medicina_general: null,
     consultorio: payload.numeroConsultorio,
     pregunta: payload.pregunta.trim(),
     valor: payload.valor,
@@ -80,6 +83,9 @@ export interface AdminResponseRow {
   nombre_de_la_unidad: string | null;
   internet: string | null;
   consultorios_habilitados: number | null;
+  tiene_consultorios_inoperantes: string | null;
+  consultorios_inhabilitados: number | null;
+  total_consultorios_medicina_general: number | null;
   consultorio: number | null;
   pregunta: string | null;
   valor: number | null;
@@ -240,7 +246,7 @@ export async function fetchUnitResponses(clues: string): Promise<{ answers: Reco
     const officeCount = rows.find((row) => row.tipo_registro === 'respuesta' && row.pregunta === 'consultorios');
 
     rows
-      .filter((row) => row.tipo_registro === 'respuesta' && row.pregunta !== 'consultorios')
+      .filter((row) => row.tipo_registro === 'respuesta' && row.pregunta !== 'consultorios' && row.valor !== null)
       .forEach((row) => {
         const officeNumber = Number(row.consultorio);
         if (row.turno) turns[officeNumber] = row.turno;
@@ -261,9 +267,13 @@ export async function fetchUnitResponses(clues: string): Promise<{ answers: Reco
       entidad: config.entidad || '',
       usuarioNombre: config.usuario_nombre || '',
       hasInternet: config.internet || 'PENDIENTE',
-      enabledOffices: Number(config.consultorios_habilitados) || 0,
-      unoperatedOffices: 0,
-      configuredOffices: Number(officeCount?.consultorio) || 0,
+      hasTemporarilyClosedOffices: config.tiene_consultorios_inoperantes || 'PENDIENTE',
+      enabledOffices: config.consultorios_habilitados === null ? null : Number(config.consultorios_habilitados),
+      unoperatedOffices: config.consultorios_inhabilitados === null ? null : Number(config.consultorios_inhabilitados),
+      totalGeneralOffices: config.total_consultorios_medicina_general === null
+        ? null
+        : Number(config.total_consultorios_medicina_general),
+      configuredOffices: officeCount ? Number(officeCount.consultorio) : null,
       turns,
       updatedAt: config.fecha_registro || new Date().toISOString()
     } satisfies UnitGeneralData : undefined;
@@ -326,7 +336,7 @@ export async function saveSingleAnswer(payload: {
   numeroConsultorios: number;
   numeroConsultorio: number;
   pregunta: string;
-  valor: number | null;
+  valor: number;
   turno?: string;
   tipoRegistro?: string;
   version?: number;
@@ -365,6 +375,9 @@ export async function saveUnitGeneral(clues: string, generalData: UnitGeneralDat
       clues_imb: normalizedClues,
       internet: generalData.hasInternet,
       consultorios_habilitados: generalData.enabledOffices,
+      tiene_consultorios_inoperantes: generalData.hasTemporarilyClosedOffices,
+      consultorios_inhabilitados: generalData.unoperatedOffices,
+      total_consultorios_medicina_general: generalData.totalGeneralOffices,
       consultorio: null,
       pregunta: null,
       valor: null,
@@ -378,6 +391,9 @@ export async function saveUnitGeneral(clues: string, generalData: UnitGeneralDat
       clues_imb: normalizedClues,
       internet: null,
       consultorios_habilitados: null,
+      tiene_consultorios_inoperantes: null,
+      consultorios_inhabilitados: null,
+      total_consultorios_medicina_general: null,
       consultorio: generalData.configuredOffices,
       pregunta: 'consultorios',
       valor: null,
@@ -391,12 +407,14 @@ export async function saveUnitGeneral(clues: string, generalData: UnitGeneralDat
       : await client.from('respuestas').insert(configRow);
     if (configResult.error) throw configResult.error;
 
-    const existingCount = await client.from('respuestas').select('id').eq('clues_imb', normalizedClues).eq('tipo_registro', 'respuesta').eq('pregunta', 'consultorios').maybeSingle();
-    if (existingCount.error) throw existingCount.error;
-    const countResult = existingCount.data
-      ? await client.from('respuestas').update(countRow).eq('id', existingCount.data.id)
-      : await client.from('respuestas').insert(countRow);
-    if (countResult.error) throw countResult.error;
+    if (generalData.configuredOffices !== null) {
+      const existingCount = await client.from('respuestas').select('id').eq('clues_imb', normalizedClues).eq('tipo_registro', 'respuesta').eq('pregunta', 'consultorios').maybeSingle();
+      if (existingCount.error) throw existingCount.error;
+      const countResult = existingCount.data
+        ? await client.from('respuestas').update(countRow).eq('id', existingCount.data.id)
+        : await client.from('respuestas').insert(countRow);
+      if (countResult.error) throw countResult.error;
+    }
 
     for (const [officeNumber, turn] of Object.entries(generalData.turns)) {
       if (!turn) continue;

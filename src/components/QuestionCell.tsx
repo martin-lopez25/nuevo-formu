@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext.tsx';
 import { Check, AlertCircle, Save, X } from 'lucide-react';
 import { TurnType } from '../types.ts';
+import { NumericStepper } from './NumericStepper.tsx';
 
 interface QuestionCellProps {
   officeNumber: number;
@@ -56,9 +57,8 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
   const handleSave = async () => {
     const trimmed = inputValue.trim();
 
-    // If empty, mark as PENDIENTE (null)
     if (trimmed === '') {
-      await handleSaveAnswer(officeNumber, question, null);
+      setEditingCell(null);
       return;
     }
 
@@ -69,16 +69,6 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
     }
 
     await handleSaveAnswer(officeNumber, question, num);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleSave();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      handleCancelEdit();
-    }
   };
 
   // Determine visual color state
@@ -116,38 +106,39 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
   return (
     <td className="p-1 sm:p-2 text-center align-middle relative group">
       {isEditing ? (
-        <div className="flex items-center justify-center gap-1 min-w-[110px] bg-[#1E5B4F]/90 p-1.5 rounded-lg border border-amber-400 shadow-2xl z-20 relative">
-          <input
-            ref={inputRef}
-            type="number"
-            min="0"
-            step="1"
-            value={inputValue}
-            onChange={(e) => {
-              setInputValue(e.target.value);
-              setErrorMsg('');
-            }}
-            onKeyDown={handleKeyDown}
-            placeholder="0"
-            className="w-12 px-1.5 py-1 text-center bg-[#1E5B4F]/80 border border-white/30 text-white font-bold text-xs rounded focus:outline-none focus:ring-1 focus:ring-amber-300"
-          />
-          <button
-            type="button"
-            onClick={handleSave}
-            className="px-2 py-1 bg-[#A57F2C] hover:bg-[#b88f33] text-black font-extrabold text-[10px] rounded transition-colors flex items-center gap-0.5"
-            title="Guardar (Enter)"
-          >
-            <Save className="w-3 h-3" />
-            <span className="hidden sm:inline">GUARDAR</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleCancelEdit}
-            className="p-1 text-zinc-400 hover:text-white rounded transition-colors"
-            title="Cancelar (Esc)"
-          >
-            <X className="w-3 h-3" />
-          </button>
+        <div className="min-w-[210px] bg-[#1E5B4F]/90 p-2 rounded-lg border border-amber-400 shadow-2xl z-20 relative">
+          <div className="flex items-center justify-center gap-1">
+            <NumericStepper
+              inputRef={inputRef}
+              min="0"
+              value={inputValue}
+              onChange={(value) => {
+                setInputValue(value);
+                setErrorMsg('');
+              }}
+              onEnter={handleSave}
+              onEscape={handleCancelEdit}
+              inputClassName="w-10 px-1 py-1 text-xs font-bold text-white"
+            />
+            <button
+              type="button"
+              onClick={handleSave}
+              className="px-2 py-1 bg-[#A57F2C] hover:bg-[#b88f33] text-black font-extrabold text-[10px] rounded transition-colors flex items-center gap-0.5"
+              title="Guardar (Enter)"
+            >
+              <Save className="w-3 h-3" />
+              <span className="hidden sm:inline">GUARDAR</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleCancelEdit}
+              className="p-1 text-zinc-400 hover:text-white rounded transition-colors"
+              title="Cancelar (Esc)"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+          <p className="mt-0.5 text-[9px] leading-tight text-zinc-300">Capture únicamente bienes en condiciones óptimas de funcionamiento.</p>
           {errorMsg && (
             <div className="absolute -bottom-6 left-0 right-0 text-[10px] text-rose-300 bg-rose-950 px-1 py-0.5 rounded border border-rose-600 z-30">
               {errorMsg}
@@ -159,10 +150,12 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
           type="button"
           onClick={handleStartEdit}
           title={tooltipText}
-          className={`w-full min-w-[70px] sm:min-w-[90px] py-2 px-2 rounded-lg border text-xs transition-all duration-200 flex items-center justify-center gap-1 shadow-sm ${bgClass}`}
+          className={`w-full min-w-[70px] sm:min-w-[90px] py-2 px-2 rounded-lg border text-xs transition-all duration-200 flex flex-col items-center justify-center gap-0.5 shadow-sm ${bgClass}`}
         >
-          <span className={badgeColor}>{statusBadge}</span>
-          {isCloudSaved && <Check className="w-3 h-3 text-[#A57F2C]" />}
+          <span className="flex items-center gap-1">
+            <span className={badgeColor}>{statusBadge}</span>
+            {isCloudSaved && <Check className="w-3 h-3 text-[#A57F2C]" />}
+          </span>
         </button>
       )}
 

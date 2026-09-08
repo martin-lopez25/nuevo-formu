@@ -1,4 +1,5 @@
 import express from 'express';
+import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
@@ -40,9 +41,11 @@ interface StoredUnitConfig {
   entidad: string;
   usuarioNombre: string;
   hasInternet: 'SI' | 'NO' | 'PENDIENTE';
-  enabledOffices: number;
-  unoperatedOffices: number;
-  configuredOffices: number;
+  hasTemporarilyClosedOffices: 'SI' | 'NO' | 'PENDIENTE';
+  enabledOffices: number | null;
+  unoperatedOffices: number | null;
+  totalGeneralOffices: number | null;
+  configuredOffices: number | null;
   turns: Record<number, string>;
   updatedAt: string;
 }
@@ -140,6 +143,9 @@ function configToDatabase(config: StoredUnitConfig) {
     clues_imb: config.clues,
     internet: config.hasInternet,
     consultorios_habilitados: config.enabledOffices,
+    tiene_consultorios_inoperantes: config.hasTemporarilyClosedOffices,
+    consultorios_inhabilitados: config.unoperatedOffices,
+    total_consultorios_medicina_general: config.totalGeneralOffices,
     consultorio: null,
     pregunta: null,
     valor: null,
@@ -169,9 +175,13 @@ function configFromDatabase(row: any): StoredUnitConfig {
     entidad: row.entidad || '',
     usuarioNombre: row.usuario_nombre || '',
     hasInternet: row.internet || 'PENDIENTE',
-    enabledOffices: Number(row.consultorios_habilitados) || 0,
-    unoperatedOffices: 0,
-    configuredOffices: 0,
+    hasTemporarilyClosedOffices: row.tiene_consultorios_inoperantes || 'PENDIENTE',
+    enabledOffices: row.consultorios_habilitados === null ? null : Number(row.consultorios_habilitados),
+    unoperatedOffices: row.consultorios_inhabilitados === null ? null : Number(row.consultorios_inhabilitados),
+    totalGeneralOffices: row.total_consultorios_medicina_general === null
+      ? null
+      : Number(row.total_consultorios_medicina_general),
+    configuredOffices: null,
     turns: {},
     updatedAt: row.fecha_registro
   };
@@ -434,9 +444,11 @@ app.post('/api/unidades/:clues/configuracion/', async (req, res) => {
       entidad: body.entidad || '',
       usuarioNombre: body.usuarioNombre || '',
       hasInternet: body.hasInternet || 'PENDIENTE',
-      enabledOffices: Number(body.enabledOffices) || 0,
-      unoperatedOffices: Number(body.unoperatedOffices) || 0,
-      configuredOffices: Number(body.configuredOffices) || 0,
+      hasTemporarilyClosedOffices: body.hasTemporarilyClosedOffices || 'PENDIENTE',
+      enabledOffices: body.enabledOffices === null ? null : Number(body.enabledOffices),
+      unoperatedOffices: body.unoperatedOffices === null ? null : Number(body.unoperatedOffices),
+      totalGeneralOffices: body.totalGeneralOffices === null ? null : Number(body.totalGeneralOffices),
+      configuredOffices: body.configuredOffices == null ? null : Number(body.configuredOffices),
       turns: body.turns || {},
       updatedAt: new Date().toISOString()
     };
@@ -454,12 +466,14 @@ app.post('/api/unidades/:clues/configuracion/', async (req, res) => {
         : await sb.from('respuestas').insert(row);
       if (error) throw error;
 
-      const existingCount = await sb.from('respuestas').select('clues_imb').eq('clues_imb', clues).eq('tipo_registro', 'respuesta').eq('pregunta', 'consultorios').maybeSingle();
-      if (existingCount.error) throw existingCount.error;
-      const { error: countError } = existingCount.data
-        ? await sb.from('respuestas').update(officeCountRow).eq('clues_imb', clues).eq('tipo_registro', 'respuesta').eq('pregunta', 'consultorios')
-        : await sb.from('respuestas').insert(officeCountRow);
-      if (countError) throw countError;
+      if (config.configuredOffices !== null) {
+        const existingCount = await sb.from('respuestas').select('clues_imb').eq('clues_imb', clues).eq('tipo_registro', 'respuesta').eq('pregunta', 'consultorios').maybeSingle();
+        if (existingCount.error) throw existingCount.error;
+        const { error: countError } = existingCount.data
+          ? await sb.from('respuestas').update(officeCountRow).eq('clues_imb', clues).eq('tipo_registro', 'respuesta').eq('pregunta', 'consultorios')
+          : await sb.from('respuestas').insert(officeCountRow);
+        if (countError) throw countError;
+      }
       await updateOfficeTurns(config, sb);
     }
 
@@ -499,10 +513,10 @@ app.post('/api/respuestas/', async (req, res) => {
       });
     }
 
-    if (valor !== null && valor !== undefined && (isNaN(Number(valor)) || Number(valor) < 0 || !Number.isInteger(Number(valor)))) {
+    if (valor === null || valor === undefined || isNaN(Number(valor)) || Number(valor) < 0 || !Number.isInteger(Number(valor))) {
       return res.status(400).json({
         success: false,
-        message: 'El valor debe ser un número entero mayor o igual a 0, o PENDIENTE (null)'
+        message: 'La cantidad es obligatoria y debe ser un número entero mayor o igual a 0'
       });
     }
 
@@ -521,7 +535,7 @@ app.post('/api/respuestas/', async (req, res) => {
       numeroConsultorios: Number(numeroConsultorios) || (prev ? prev.numeroConsultorios : 1),
       numeroConsultorio: Number(numeroConsultorio),
       pregunta: pregunta.trim(),
-      valor: valor !== null && valor !== undefined ? Number(valor) : null,
+      valor: Number(valor),
       turno: turno || (prev ? prev.turno : ''),
       tipoRegistro: tipoRegistro || 'Captura Individual',
       fechaActualizacion: new Date().toISOString(),
@@ -601,6 +615,10 @@ app.post('/api/sincronizar/', async (req, res) => {
     for (const item of items) {
       if (item.action === 'save_answer' && item.payload) {
         const p = item.payload;
+        if (p.valor === null || p.valor === undefined) {
+          syncedIds.push(item.id);
+          continue;
+        }
         const normClues = (p.clues || '').trim().toUpperCase();
         const key = `${normClues}_${p.numeroConsultorio}_${(p.pregunta || '').trim()}`;
         const prev = answersStore.get(key);
@@ -616,7 +634,7 @@ app.post('/api/sincronizar/', async (req, res) => {
           numeroConsultorios: Number(p.numeroConsultorios) || 1,
           numeroConsultorio: Number(p.numeroConsultorio),
           pregunta: p.pregunta,
-          valor: p.valor !== undefined && p.valor !== null ? Number(p.valor) : null,
+          valor: Number(p.valor),
           turno: p.turno || '',
           tipoRegistro: 'Sincronización Offline',
           fechaActualizacion: new Date().toISOString(),
@@ -642,9 +660,11 @@ app.post('/api/sincronizar/', async (req, res) => {
           entidad: p.entidad || '',
           usuarioNombre: p.usuarioNombre || '',
           hasInternet: p.hasInternet || 'PENDIENTE',
-          enabledOffices: Number(p.enabledOffices) || 0,
-          unoperatedOffices: Number(p.unoperatedOffices) || 0,
-          configuredOffices: Number(p.configuredOffices) || 0,
+          hasTemporarilyClosedOffices: p.hasTemporarilyClosedOffices || 'PENDIENTE',
+          enabledOffices: p.enabledOffices === null ? null : Number(p.enabledOffices),
+          unoperatedOffices: p.unoperatedOffices === null ? null : Number(p.unoperatedOffices),
+          totalGeneralOffices: p.totalGeneralOffices === null ? null : Number(p.totalGeneralOffices),
+          configuredOffices: p.configuredOffices == null ? null : Number(p.configuredOffices),
           turns: p.turns || {},
           updatedAt: new Date().toISOString()
         };
@@ -657,6 +677,15 @@ app.post('/api/sincronizar/', async (req, res) => {
             ? await sb.from('respuestas').update(row).eq('clues_imb', normClues).eq('tipo_registro', 'unidad')
             : await sb.from('respuestas').insert(row);
           if (error) throw error;
+          if (config.configuredOffices !== null) {
+            const officeCountRow = officeCountToDatabase(config);
+            const existingCount = await sb.from('respuestas').select('clues_imb').eq('clues_imb', normClues).eq('tipo_registro', 'respuesta').eq('pregunta', 'consultorios').maybeSingle();
+            if (existingCount.error) throw existingCount.error;
+            const { error: countError } = existingCount.data
+              ? await sb.from('respuestas').update(officeCountRow).eq('clues_imb', normClues).eq('tipo_registro', 'respuesta').eq('pregunta', 'consultorios')
+              : await sb.from('respuestas').insert(officeCountRow);
+            if (countError) throw countError;
+          }
           await updateOfficeTurns(config, sb);
         }
         syncedIds.push(item.id);
@@ -702,9 +731,19 @@ async function start() {
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: 'spa',
+      appType: 'custom',
     });
     app.use(vite.middlewares);
+    app.use(async (req, res, next) => {
+      try {
+        const template = await fs.readFile(path.join(__dirname, 'index.source.html'), 'utf8');
+        const html = await vite.transformIndexHtml(req.originalUrl, template);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
+      } catch (error) {
+        vite.ssrFixStacktrace(error as Error);
+        next(error);
+      }
+    });
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
