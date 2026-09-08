@@ -558,7 +558,10 @@ export default function App() {
                     avancePorEntidad={avancePorEntidad}
                     tablaEntidades={tablaEntidades}
                   />
+                </div>
+              )}
 
+              {mainTab === 'pendientes' && (
                   <div className="space-y-4">
                     <div className="flex flex-wrap gap-2">
                       {dataTabs.map(({ key, label, icon: Icon, count }) => (
@@ -642,10 +645,7 @@ export default function App() {
                       <DataTable<DataRow> exportFileName="tabla_faltantes_por_estados" exportSheetName="Tabla faltantes estados" data={tablaFaltantesPorEstados} columns={tableColumns(tablaFaltantesPorEstados, false)} exportColumns={tableColumns(tablaFaltantesPorEstados, true)} />
                     )}
                   </div>
-                </div>
               )}
-
-              {mainTab === 'pendientes' && <div className="card min-h-[240px]" />}
             </div>
 
           </>
