@@ -16,6 +16,10 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+app.use(
+  '/nuevo-formu/reporte-new/docs',
+  express.static(path.join(__dirname, 'reporte-new', 'docs'))
+);
 
 // In-Memory & Resilient Server Storage (with Supabase fallback)
 interface StoredAnswer {

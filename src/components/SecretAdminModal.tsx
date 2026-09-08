@@ -10,6 +10,7 @@ interface SecretAdminModalProps {
 }
 
 const USER_BACKGROUND = `${import.meta.env.BASE_URL}imagenes/usuario.jpg`;
+const ADMIN_REPORT_URL = `${import.meta.env.BASE_URL}reporte-new/docs/index.html`;
 const totalUnits = entities.reduce((total, entity) => total + entity.totalUnits, 0);
 const leadingEntities = [...entities]
   .sort((first, second) => second.totalUnits - first.totalUnits)
@@ -57,6 +58,32 @@ export const SecretAdminModal: React.FC<SecretAdminModalProps> = ({ isOpen, onCl
       } catch (_) {}
     }
   };
+
+  if (adminToken) {
+    return (
+      <div className="fixed inset-0 z-[100] flex flex-col bg-white" role="dialog" aria-modal="true" aria-label="Reporte administrativo">
+        <header className="flex h-14 shrink-0 items-center justify-between gap-3 bg-[#0f5b4d] px-4 text-white shadow-md sm:px-6">
+          <div className="flex min-w-0 items-center gap-2">
+            <ShieldCheck className="h-5 w-5 shrink-0 text-[#f0d68a]" />
+            <h2 className="truncate text-sm font-bold sm:text-base">Reporte administrativo</h2>
+          </div>
+          <div className="flex items-center gap-1">
+            <button onClick={() => void leaveAdmin()} className="p-2 text-emerald-50 hover:bg-white/15 hover:text-white" title="Cerrar sesión" aria-label="Cerrar sesión">
+              <LogOut className="h-5 w-5" />
+            </button>
+            <button onClick={() => void leaveAdmin()} className="p-2 text-emerald-50 hover:bg-white/15 hover:text-white" title="Cerrar panel" aria-label="Cerrar panel">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </header>
+        <iframe
+          src={ADMIN_REPORT_URL}
+          title="Reporte de infraestructura de materiales hospitalarios"
+          className="min-h-0 w-full flex-1 border-0 bg-white"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[100] bg-[#f5f7f5] text-[#17352f]" role="dialog" aria-modal="true" aria-label="Administración">
