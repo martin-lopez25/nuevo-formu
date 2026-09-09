@@ -6,6 +6,7 @@ import {
   HelpCircle,
   Clock,
   Info,
+  WifiOff,
   ArrowRight,
   ArrowLeft
 } from 'lucide-react';
@@ -69,11 +70,11 @@ export const Section2InstructionsVisuals: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 text-xs">
               <div className="p-3 rounded-xl bg-white/60 border border-emerald-600/60 flex flex-col gap-1 backdrop-blur-sm shadow-inner">
                 <span className="font-bold text-black">VERDE</span>
-                <span className="text-[11px] text-black leading-snug">Valor &gt; 0 registrado</span>
+                <span className="text-[11px] text-black leading-snug">Valor &gt; 0 guardado localmente</span>
               </div>
               <div className="p-3 rounded-xl bg-white/60 border border-blue-600/60 flex flex-col gap-1 backdrop-blur-sm shadow-inner">
                 <span className="font-bold text-black">AZUL</span>
-                <span className="text-[11px] text-black leading-snug">Valor 0 registrado</span>
+                <span className="text-[11px] text-black leading-snug">Valor 0 guardado localmente</span>
               </div>
               <div className="p-3 rounded-xl bg-white/60 border border-rose-600/60 flex flex-col gap-1 backdrop-blur-sm shadow-inner">
                 <span className="font-bold text-black">ROJO</span>
@@ -87,7 +88,7 @@ export const Section2InstructionsVisuals: React.FC = () => {
               </div>
               <div className="p-3 rounded-xl bg-white/60 border-2 border-emerald-600 flex flex-col gap-1 col-span-2 sm:col-span-1 backdrop-blur-sm shadow-inner">
                 <span className="font-bold text-black">FILA RESALTADA</span>
-                <span className="text-[11px] text-black leading-snug">Unidad guardada en BD</span>
+                <span className="text-[11px] text-black leading-snug">Pregunta respondida en todos los consultorios</span>
               </div>
             </div>
           </div>
@@ -100,18 +101,28 @@ export const Section2InstructionsVisuals: React.FC = () => {
                 7. Guardado Automático
               </h4>
               <p className="text-xs text-black leading-relaxed">
-                El turno se guarda automáticamente al seleccionar el horario correspondiente. Cada pregunta se guarda automáticamente al presionar Enter en el teclado o al salir de la celda.
+                El turno se guarda al seleccionar el horario correspondiente. Cada cantidad se guarda al presionar Enter o el botón Guardar. Si no hay conexión, los cambios quedan almacenados en este dispositivo para sincronizarse después.
               </p>
             </div>
             <div className="p-4 rounded-2xl bg-white/35 border border-black/15 backdrop-blur-sm shadow-sm">
               <h4 className="font-bold text-black text-xs mb-1.5 flex items-center gap-1.5">
                 <Info className="w-4 h-4 text-[#A57F2C]" />
-                8. Ver Detalles
+                9. Ver Detalles
               </h4>
               <p className="text-xs text-black leading-relaxed">
-                Haga clic en &quot;Ver detalles&quot; en cualquier momento para consultar el resumen administrativo de la unidad médica activa y su porcentaje de llenado.
+                Haga clic en &quot;Ver detalles&quot; para consultar los datos generales de la unidad y el avance del catálogo de equipamiento. El porcentaje no incluye Internet, disponibilidad de consultorios ni turnos.
               </p>
             </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-white/35 border border-black/15 backdrop-blur-sm shadow-sm">
+            <h4 className="font-bold text-black text-xs mb-1.5 flex items-center gap-1.5">
+              <WifiOff className="w-4 h-4 text-[#A57F2C]" />
+              8. Captura sin Internet y Sincronización
+            </h4>
+            <p className="text-xs text-black leading-relaxed">
+              Puede continuar capturando cuando aparezca &quot;SIN CONEXIÓN&quot;: las respuestas se guardan localmente en este dispositivo y el número del indicador superior muestra los cambios pendientes. Al recuperar Internet, el sistema intentará enviarlos automáticamente. También puede hacer clic en el indicador de conexión para reintentar la sincronización. No cierre ni borre los datos del navegador mientras existan pendientes; el color dorado y el icono ✓ confirman que una respuesta ya se guardó en la nube.
+            </p>
           </div>
 
           {/* Tips / Consejos */}
@@ -123,10 +134,10 @@ export const Section2InstructionsVisuals: React.FC = () => {
             <ul className="text-xs text-black space-y-1.5 list-disc list-inside leading-relaxed">
               <li>Use solamente números enteros para las cantidades.</li>
               <li>El 0 es un valor válido (se marcará en color azul).</li>
-              <li>Cada campo se guarda automáticamente al presionar Enter.</li>
+              <li>Guarde cada cantidad con Enter o con el botón Guardar.</li>
               <li>El progreso local se resguarda en el navegador incluso si se interrumpe la conexión.</li>
               <li>Pase el cursor sobre cualquier celda para ver la descripción completa de la pregunta.</li>
-              <li>Busque el icono ✓ para confirmar la sincronización con el servidor central.</li>
+              <li>El color dorado y el icono ✓ confirman la sincronización con el servidor central.</li>
             </ul>
           </div>
 

@@ -69,7 +69,7 @@ export const Section2Instructions: React.FC = () => {
                 Registrar Datos del Usuario
               </h3>
               <p className="text-xs text-black leading-relaxed">
-                Complete el formulario con nombre completo y correo electrónico institucional del capturista.
+                Capture el nombre completo y un correo electrónico institucional con formato válido. Ambos campos son obligatorios.
               </p>
             </div>
 
@@ -89,7 +89,7 @@ export const Section2Instructions: React.FC = () => {
                 Configurar Consultorios
               </h3>
               <p className="text-xs text-black leading-relaxed">
-                Ingrese el número de consultorios que tiene la unidad (0 - 20) y presione &quot;Aplicar&quot; para generar la matriz.
+                Ingrese el número de consultorios que se capturarán para el informe SUS (de 0 a 20) y presione &quot;Aplicar&quot; para generar la matriz.
               </p>
             </div>
 
@@ -100,8 +100,8 @@ export const Section2Instructions: React.FC = () => {
               </h3>
               <p className="text-xs text-black leading-relaxed">
                 Responda las preguntas que no dependen de consultorios:
-                <br />• <strong>Internet:</strong> Seleccione SI o NO.
-                <br />• <strong>Consultorios de Medicina General:</strong> Indique si existen consultorios que no operan temporalmente. Capture los habilitados y, cuando corresponda, los inhabilitados; el total se calcula automáticamente.
+                <br />• <strong>Internet:</strong> Seleccione SÍ, NO o PENDIENTE.
+                <br />• <strong>Consultorios de Medicina General:</strong> Indique si existen consultorios que no operan temporalmente. Capture los habilitados y, si seleccionó SÍ, los inhabilitados; el total se calcula automáticamente.
               </p>
             </div>
 
@@ -113,7 +113,7 @@ export const Section2Instructions: React.FC = () => {
               <p className="text-xs text-black leading-relaxed">
                 Para cada consultorio complete:
                 <br />• <strong>Turno:</strong> Seleccione el horario correspondiente, incluyendo las modalidades matutinas por días de operación.
-                <br />• <strong>Cantidad:</strong> Haga clic en la celda, ingrese el valor y presione Enter.
+                <br />• <strong>Cantidad:</strong> Haga clic en la celda, capture un número entero igual o mayor que 0 y guárdelo con Enter o con el botón Guardar. Cuente únicamente bienes en condiciones óptimas de funcionamiento.
               </p>
             </div>
           </div>

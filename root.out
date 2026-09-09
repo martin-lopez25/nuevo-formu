@@ -1,6 +1,13 @@
 <!doctype html>
 <html lang="es">
   <head>
+    <script type="module">import { injectIntoGlobalHook } from "/nuevo-formu/@react-refresh";
+injectIntoGlobalHook(window);
+window.$RefreshReg$ = () => {};
+window.$RefreshSig$ = () => (type) => type;</script>
+
+    <script type="module" src="/nuevo-formu/@vite/client"></script>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cuestionario de Equipamiento por Unidad Médica</title>
@@ -9,8 +16,8 @@
     <meta property="og:description" content="Cuestionario de equipamiento para unidades médicas IMSS-Bienestar." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <script type="module" crossorigin src="/nuevo-formu/pages-assets/index.source-De27TNf1.js"></script>
-    <link rel="stylesheet" crossorigin href="/nuevo-formu/pages-assets/index-DFj29S3O.css">
+    <script type="module" crossorigin src="/nuevo-formu/nuevo-formu/pages-assets/index.source-BGnrymLg.js"></script>
+    <link rel="stylesheet" crossorigin href="/nuevo-formu/nuevo-formu/pages-assets/index-C3tFIEaz.css">
   </head>
   <body>
     <div id="root"></div>
