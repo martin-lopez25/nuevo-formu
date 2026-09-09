@@ -148,12 +148,17 @@ export default function App() {
   const [faltantes, setFaltantes] = useState<DataRow[]>([]);
   const [cluesGeo, setCluesGeo] = useState<CluesGeoItem[]>([]);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  async function load() {
+  async function load(isRefresh = false) {
     try {
-      setLoading(true);
+      if (isRefresh) {
+        setIsSyncing(true);
+      } else {
+        setLoading(true);
+      }
       setError(null);
-      const { tablas } = await cargarTablasFormulario();
+      const { tablas, fetchedAt } = await cargarTablasFormulario();
       setBaseClues(tablas.baseClues);
       setBaseMeta(tablas.baseMeta);
       setBaseAn(tablas.baseAn);
@@ -167,13 +172,15 @@ export default function App() {
       setTablaFaltantesPorEstados(tablas.tablaFaltantesPorEstados);
       setFaltantes(tablas.faltantes);
       setCluesGeo(tablas.cluesGeo);
-
-      const updatedFromScript = parseDateValue(tablas.baseMeta.scriptLastRunAt);
-      setLastUpdate(updatedFromScript ?? inferDataUpdatedAt(tablas.baseAn));
+      setLastUpdate(fetchedAt);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ocurrio un error al cargar datos');
     } finally {
-      setLoading(false);
+      if (isRefresh) {
+        setIsSyncing(false);
+      } else {
+        setLoading(false);
+      }
     }
   }
 
@@ -516,6 +523,9 @@ export default function App() {
     <div className="min-h-screen bg-gray-50">
       <Header
         onLogoClick={handleLogoClick}
+        onSync={() => load(true)}
+        isSyncing={isSyncing}
+        lastUpdateLabel={lastUpdateLabel}
         eyebrow={headerContent.eyebrow}
         title={headerContent.title}
         subtitle={headerContent.subtitle}

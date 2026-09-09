@@ -1,13 +1,21 @@
 
+import { RefreshCw } from 'lucide-react';
+
 const LOGO_URL = 'https://imssbienestar.gob.mx/assets/img/imb_b.svg';
 
 export function Header({
   onLogoClick,
+  onSync,
+  isSyncing = false,
+  lastUpdateLabel,
   eyebrow,
   title,
   subtitle,
 }: {
   onLogoClick?: () => void;
+  onSync?: () => void;
+  isSyncing?: boolean;
+  lastUpdateLabel?: string;
   eyebrow?: string;
   title?: string;
   subtitle?: string;
@@ -19,8 +27,8 @@ export function Header({
 
   return (
     <>
-      <nav className="sticky top-0 z-30 border-b border-gray-200 bg-white">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <nav className="sticky top-0 z-50 border-b border-gray-200 bg-white shadow-sm">
+        <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-3 px-4 py-2 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <img
               src={LOGO_URL}
@@ -34,7 +42,23 @@ export function Header({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-3">
+            {lastUpdateLabel && (
+              <span className="hidden max-w-56 text-right text-xs leading-tight text-gray-500 md:inline" aria-live="polite">
+                Última sincronización: {lastUpdateLabel}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={onSync}
+              disabled={!onSync || isSyncing}
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#7f1734] bg-[#9b2247] px-4 text-xs font-extrabold text-white shadow-md transition-colors hover:bg-[#7f1734] disabled:cursor-wait disabled:opacity-60"
+              title="Consultar los datos más recientes"
+              aria-label={isSyncing ? 'Sincronizando datos' : 'Sincronizar datos'}
+            >
+              <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{isSyncing ? 'SINCRONIZANDO...' : 'SINCRONIZAR'}</span>
+            </button>
           </div>
         </div>
       </nav>

@@ -135,6 +135,9 @@ async function fetchLiveAdvanceTables(): Promise<{
       nombre_de_la_unidad: unit.name,
       internet: config?.internet,
       consultorios_habilitados: config?.consultorios_habilitados,
+      tiene_consultorios_inoperantes: config?.tiene_consultorios_inoperantes,
+      consultorios_inhabilitados: config?.consultorios_inhabilitados,
+      total_consultorios_medicina_general: config?.total_consultorios_medicina_general,
       consultorio: office,
       turno_consultorio: row.turno,
     };
@@ -176,17 +179,48 @@ async function fetchLiveAdvanceTables(): Promise<{
       nombre_de_la_unidad: unit?.name ?? String(config?.nombre_de_la_unidad ?? ''),
       internet: config?.internet,
       consultorios_habilitados: config?.consultorios_habilitados,
+      tiene_consultorios_inoperantes: config?.tiene_consultorios_inoperantes,
+      consultorios_inhabilitados: config?.consultorios_inhabilitados,
+      total_consultorios_medicina_general: config?.total_consultorios_medicina_general,
       consultorio: response.maxOffice,
     };
   });
 
+  const unitGeneralColumns = new Set([
+    'internet',
+    'consultorios_habilitados',
+    'tiene_consultorios_inoperantes',
+    'consultorios_inhabilitados',
+    'total_consultorios_medicina_general',
+  ]);
   const resumenEntidadMap = new Map<string, DataRow>();
   for (const row of resultado) {
     const entidad = String(row.entidad ?? 'Sin entidad');
     const aggregate = resumenEntidadMap.get(entidad) ?? { entidad };
     for (const [column, value] of Object.entries(row)) {
-      if (column === 'entidad' || column === 'clues_imb' || column === 'nombre_de_la_unidad' || column === 'turno_consultorio') continue;
+      if (column === 'entidad' || column === 'clues_imb' || column === 'nombre_de_la_unidad' || column === 'turno_consultorio' || column === 'consultorio' || unitGeneralColumns.has(column)) continue;
       if (typeof value === 'number') aggregate[column] = Number(aggregate[column] ?? 0) + value;
+    }
+    aggregate.consultorio = Number(aggregate.consultorio ?? 0) + 1;
+    resumenEntidadMap.set(entidad, aggregate);
+  }
+
+  for (const row of resumen) {
+    const entidad = String(row.entidad ?? 'Sin entidad');
+    const aggregate = resumenEntidadMap.get(entidad) ?? { entidad, consultorio: 0 };
+    for (const column of ['consultorios_habilitados', 'consultorios_inhabilitados', 'total_consultorios_medicina_general']) {
+      const value = row[column];
+      if (typeof value === 'number') aggregate[column] = Number(aggregate[column] ?? 0) + value;
+    }
+
+    const inoperantes = normalize(row.tiene_consultorios_inoperantes);
+    if (inoperantes === 'SI' || inoperantes === 'SÍ' || inoperantes === 'TRUE' || inoperantes === '1') {
+      aggregate.tiene_consultorios_inoperantes = 'SI';
+    } else if (
+      aggregate.tiene_consultorios_inoperantes !== 'SI'
+      && (inoperantes === 'NO' || inoperantes === 'FALSE' || inoperantes === '0')
+    ) {
+      aggregate.tiene_consultorios_inoperantes = 'NO';
     }
     resumenEntidadMap.set(entidad, aggregate);
   }
@@ -194,7 +228,7 @@ async function fetchLiveAdvanceTables(): Promise<{
 
   const faltantes = resultado.flatMap((row) => {
     const missing = questionColumns
-      .filter((column) => row[column] === 0)
+      .filter((column) => row[column] === null || row[column] === undefined)
       .map((column) => column.replace(/_consultorio$/, ''));
     if (!missing.length) return [];
     return [{
