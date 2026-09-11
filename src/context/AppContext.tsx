@@ -20,7 +20,8 @@ import {
   saveAppDraft,
   getAppDraft,
   makeAnswerKey,
-  deleteLocalAnswersForUnit
+  deleteLocalAnswersForUnit,
+  deleteLocalTurnSchedules
 } from '../services/db.ts';
 import {
   checkServerHealth,
@@ -28,7 +29,8 @@ import {
   saveUnitGeneral,
   syncBatchQueue,
   fetchUnitResponses,
-  deleteUnitAnswers
+  deleteUnitAnswers,
+  deleteOfficeTurnSchedules
 } from '../services/api.ts';
 import { EQUIPMENT_CATALOG } from '../data/equipmentCatalog.ts';
 import {
@@ -37,7 +39,8 @@ import {
   isDoctorAvailabilityQuestion,
   isOfficeScheduleQuestion,
   OFFICE_ENABLED_QUESTION,
-  TURN_SELECTION_QUESTION
+  TURN_SELECTION_QUESTION,
+  type OperationalTurn
 } from '../data/officeConfiguration.ts';
 
 export type AppSection = 'inicio' | 'instrucciones' | 'instrucciones_2' | 'formulario';
@@ -297,7 +300,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 clues: draft.selectedUnit.clues,
                 entidad: draft.selectedEntity || draft.selectedUnit.entity,
                 usuarioNombre: draft.user?.name || '',
-                ...(serverRes.general || {})
+                ...(serverRes.general || {}),
+                nombreUnidad: draft.selectedUnit.name || serverRes.general?.nombreUnidad || '',
+                usuarioEmail: draft.user?.email || serverRes.general?.usuarioEmail || ''
               };
               setAnswers(serverRes.answers || {});
               setGeneralData(serverGeneral);
@@ -317,7 +322,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 clues: draft.selectedUnit.clues,
                 entidad: draft.selectedEntity || draft.selectedUnit.entity,
                 usuarioNombre: draft.user?.name || '',
-                ...(localGeneral || {})
+                ...(localGeneral || {}),
+                nombreUnidad: draft.selectedUnit.name || localGeneral?.nombreUnidad || '',
+                usuarioEmail: draft.user?.email || localGeneral?.usuarioEmail || ''
               });
             }
           }
@@ -369,7 +376,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const baseGeneral: UnitGeneralData = {
       clues: unit.clues,
       entidad: selectedEntity || unit.entity,
+      nombreUnidad: unit.name,
       usuarioNombre: user?.name || '',
+      usuarioEmail: user?.email || '',
       hasInternet: unit.hasInternet || 'PENDIENTE',
       hasTemporarilyClosedOffices: 'PENDIENTE',
       enabledOffices: unit.enabledOffices ?? null,
@@ -392,7 +401,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ...baseGeneral,
           ...serverRes.general,
           entidad: selectedEntity || unit.entity,
-          usuarioNombre: user?.name || serverRes.general.usuarioNombre || ''
+          nombreUnidad: unit.name || serverRes.general.nombreUnidad || '',
+          usuarioNombre: user?.name || serverRes.general.usuarioNombre || '',
+          usuarioEmail: user?.email || serverRes.general.usuarioEmail || ''
         };
       }
       await Promise.all([
@@ -475,6 +486,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...prev,
         entidad: selectedEntity || selectedUnit?.entity || prev.entidad,
         usuarioNombre: user?.name || prev.usuarioNombre || '',
+        usuarioEmail: user?.email || prev.usuarioEmail || '',
         configuredOffices: safeCount,
         turns: newTurns,
         updatedAt: new Date().toISOString()
@@ -510,6 +522,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...generalData,
         entidad: selectedEntity || selectedUnit.entity || generalData.entidad,
         usuarioNombre: user?.name || generalData.usuarioNombre || '',
+        usuarioEmail: user?.email || generalData.usuarioEmail || '',
         configuredOffices: 0,
         turns: {},
         updatedAt: new Date().toISOString()
@@ -533,6 +546,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...generalData,
       entidad: selectedEntity || selectedUnit.entity || generalData.entidad,
       usuarioNombre: user?.name || generalData.usuarioNombre || '',
+      usuarioEmail: user?.email || generalData.usuarioEmail || '',
       hasInternet: status,
       updatedAt: new Date().toISOString()
     };
@@ -565,6 +579,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...generalData,
       entidad: selectedEntity || selectedUnit.entity || generalData.entidad,
       usuarioNombre: user?.name || generalData.usuarioNombre || '',
+      usuarioEmail: user?.email || generalData.usuarioEmail || '',
       hasTemporarilyClosedOffices: status,
       enabledOffices: safeEnabled,
       unoperatedOffices: safeUnoperated,
@@ -587,11 +602,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const handleSetTurn = useCallback(async (officeNumber: number, turn: TurnType) => {
     if (!selectedUnit) return;
     const wasComplete = isQuestionnaireComplete(generalData, answers);
+    const previousTurn = generalData.turns[officeNumber];
+    const removedTurns: OperationalTurn[] = turn === 'Ambos' || !previousTurn || previousTurn === turn
+      ? []
+      : previousTurn === 'Ambos'
+        ? [turn === 'Matutino' ? 'Vespertino' : 'Matutino']
+        : previousTurn === 'Matutino' || previousTurn === 'Vespertino'
+          ? [previousTurn]
+          : [];
     const newTurns = { ...generalData.turns, [officeNumber]: turn };
     const updated: UnitGeneralData = {
       ...generalData,
       entidad: selectedEntity || selectedUnit.entity || generalData.entidad,
       usuarioNombre: user?.name || generalData.usuarioNombre || '',
+      usuarioEmail: user?.email || generalData.usuarioEmail || '',
       turns: newTurns,
       updatedAt: new Date().toISOString()
     };
@@ -600,11 +624,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const updatedAnswers: Record<string, QuestionAnswer> = { ...answers };
     Object.keys(updatedAnswers).forEach((key) => {
-      if (updatedAnswers[key].officeNumber === officeNumber) {
+      const answer = updatedAnswers[key];
+      const schedule = isOfficeScheduleQuestion(answer.question);
+      const doctor = isDoctorAvailabilityQuestion(answer.question);
+      if (
+        answer.officeNumber === officeNumber
+        && (schedule || doctor)
+        && removedTurns.some((removedTurn) => answer.question.includes(`${removedTurn} - `))
+      ) {
+        delete updatedAnswers[key];
+      } else if (answer.officeNumber === officeNumber) {
         updatedAnswers[key] = { ...updatedAnswers[key], turn };
       }
     });
     setAnswers(updatedAnswers);
+    await Promise.all(
+      removedTurns.map((removedTurn) => deleteLocalTurnSchedules(selectedUnit.clues, officeNumber, removedTurn))
+    );
     await Promise.all(
       Object.values(updatedAnswers)
         .filter((answer) => answer.officeNumber === officeNumber)
@@ -612,9 +648,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     try {
+      for (const removedTurn of removedTurns) {
+        await deleteOfficeTurnSchedules(selectedUnit.clues, officeNumber, removedTurn);
+      }
       await saveUnitGeneral(selectedUnit.clues, updated);
       addToast(`Turno ${turn} guardado para C${officeNumber}`, 'success');
     } catch {
+      for (const removedTurn of removedTurns) {
+        await addToSyncQueue({
+          action: 'delete_turn_schedules',
+          clues: selectedUnit.clues,
+          payload: { officeNumber, turn: removedTurn }
+        });
+      }
       await addToSyncQueue({ action: 'save_general', clues: selectedUnit.clues, payload: updated });
       refreshPendingCount();
       addToast(`Turno C${officeNumber} guardado localmente`, 'warning');

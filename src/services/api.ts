@@ -483,7 +483,9 @@ export async function fetchUnitResponses(clues: string): Promise<{ answers: Reco
     const general = config ? {
       clues: normalizedClues,
       entidad: config.entidad || '',
+      nombreUnidad: config.nombre_de_la_unidad || '',
       usuarioNombre: config.usuario_nombre || '',
+      usuarioEmail: config.usuario_email || '',
       hasInternet: config.internet || 'PENDIENTE',
       hasTemporarilyClosedOffices: config.consultorios_inhabilitados === null
         ? 'PENDIENTE'
@@ -596,7 +598,9 @@ export async function saveUnitGeneral(clues: string, generalData: UnitGeneralDat
       tipo_registro: 'unidad',
       entidad: generalData.entidad || '',
       usuario_nombre: generalData.usuarioNombre || '',
+      usuario_email: generalData.usuarioEmail || '',
       clues_imb: normalizedClues,
+      nombre_de_la_unidad: generalData.nombreUnidad || '',
       internet: generalData.hasInternet,
       consultorios_habilitados: generalData.enabledOffices,
       consultorios_inhabilitados: generalData.unoperatedOffices,
@@ -630,7 +634,7 @@ export async function saveUnitGeneral(clues: string, generalData: UnitGeneralDat
         usuario_nombre: generalData.usuarioNombre || '',
         usuario_email: existingOffice.data?.usuario_email || null,
         clues_imb: normalizedClues,
-        nombre_de_la_unidad: existingOffice.data?.nombre_de_la_unidad || null,
+        nombre_de_la_unidad: generalData.nombreUnidad || existingOffice.data?.nombre_de_la_unidad || '',
         consultorio: numericOffice,
         pregunta: null,
         valor: null,
@@ -646,15 +650,6 @@ export async function saveUnitGeneral(clues: string, generalData: UnitGeneralDat
         : await client.from('respuestas').insert(officeRow);
       if (turnResult.error) throw turnResult.error;
 
-      if (turn === 'Matutino' || turn === 'Vespertino') {
-        const incompatibleSchedules = await client.from('respuestas')
-          .update({ habilitado: false, medico_disponible: false, fecha_registro: timestamp })
-          .eq('clues_imb', normalizedClues)
-          .eq('tipo_registro', 'horario')
-          .eq('consultorio', numericOffice)
-          .not('turno', 'like', `${turn} - %`);
-        if (incompatibleSchedules.error) throw incompatibleSchedules.error;
-      }
     }
 
     return { success: true, message: 'Configuración general guardada', data: generalData, serverTimestamp: timestamp };
@@ -689,6 +684,30 @@ export async function deleteUnitAnswers(clues: string): Promise<ApiResponse<{ de
   return json;
 }
 
+export async function deleteOfficeTurnSchedules(
+  clues: string,
+  officeNumber: number,
+  turn: OperationalTurn
+): Promise<ApiResponse<{ deletedCount: number }>> {
+  if (supabase) {
+    const { data, error } = await supabase.rpc('eliminar_horarios_turno', {
+      p_clues: clues.trim().toUpperCase(),
+      p_consultorio: officeNumber,
+      p_turno: turn
+    });
+    if (error) throw error;
+    return { success: true, data: { deletedCount: Number(data) || 0 } };
+  }
+
+  const res = await fetch(
+    `${API_BASE}/unidades/${encodeURIComponent(clues)}/consultorios/${officeNumber}/horarios/${encodeURIComponent(turn)}/`,
+    { method: 'DELETE' }
+  );
+  const json = await res.json();
+  if (!res.ok || !json.success) throw new Error(json.message || 'No fue posible borrar los horarios del turno');
+  return json;
+}
+
 export async function syncBatchQueue(items: SyncQueueItem[]): Promise<ApiResponse<{ syncedIds: string[] }>> {
   if (supabase) {
     const syncedIds: string[] = [];
@@ -697,6 +716,12 @@ export async function syncBatchQueue(items: SyncQueueItem[]): Promise<ApiRespons
         await saveSingleAnswer(item.payload as Parameters<typeof saveSingleAnswer>[0]);
       } else if (item.action === 'save_general') {
         await saveUnitGeneral(item.clues, item.payload as unknown as UnitGeneralData);
+      } else if (item.action === 'delete_turn_schedules') {
+        await deleteOfficeTurnSchedules(
+          item.clues,
+          Number(item.payload.officeNumber),
+          item.payload.turn as OperationalTurn
+        );
       }
       syncedIds.push(item.id);
     }

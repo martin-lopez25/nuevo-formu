@@ -199,6 +199,51 @@ export async function deleteLocalAnswersForUnit(clues: string): Promise<void> {
   });
 }
 
+export async function deleteLocalTurnSchedules(
+  clues: string,
+  officeNumber: number,
+  turn: 'Matutino' | 'Vespertino'
+): Promise<void> {
+  const normClues = clues.trim().toUpperCase();
+  const matchesTurn = (question: string) =>
+    (question.startsWith('¿Opera en este horario? ') || question.startsWith('¿Cuenta con médico general? '))
+    && question.includes(`${turn} - `);
+  const db = await getDB();
+  if (!db.transaction) return;
+
+  const tx = db.transaction(['answers', 'syncQueue'], 'readwrite');
+  tx.objectStore('answers').index('clues').openCursor(IDBKeyRange.only(normClues)).onsuccess = (event) => {
+    const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result;
+    if (cursor) {
+      const answer = cursor.value as QuestionAnswer;
+      if (answer.officeNumber === officeNumber && matchesTurn(answer.question)) cursor.delete();
+      cursor.continue();
+    }
+  };
+
+  tx.objectStore('syncQueue').openCursor().onsuccess = (event) => {
+    const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result;
+    if (cursor) {
+      const item = cursor.value as SyncQueueItem;
+      const question = String(item.payload?.pregunta || '');
+      if (
+        item.clues?.trim().toUpperCase() === normClues
+        && item.action === 'save_answer'
+        && Number(item.payload?.numeroConsultorio) === officeNumber
+        && matchesTurn(question)
+      ) {
+        cursor.delete();
+      }
+      cursor.continue();
+    }
+  };
+
+  await new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 // Save Unit General Data
 export async function saveLocalGeneralData(data: UnitGeneralData): Promise<void> {
   try {

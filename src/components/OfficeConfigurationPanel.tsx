@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Check, Save, Stethoscope } from 'lucide-react';
+import { AlertTriangle, Check, Save, Stethoscope, Trash2, X } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
 import {
   DISABLED_CAUSE_CONFIRMATION_QUESTION,
@@ -9,9 +9,10 @@ import {
   getOfficeScheduleQuestion,
   getOperationalTurns,
   OFFICE_ENABLED_QUESTION,
-  WEEK_DAYS
+  WEEK_DAYS,
+  type OperationalTurn
 } from '../data/officeConfiguration.ts';
-import { TurnType } from '../types.ts';
+import { QuestionAnswer, TurnType } from '../types.ts';
 
 interface OfficeConfigurationPanelProps {
   officeNumber: number;
@@ -33,6 +34,8 @@ export const OfficeConfigurationPanel: React.FC<OfficeConfigurationPanelProps> =
   const savedCount = answers[countKey]?.value;
   const [doctorCount, setDoctorCount] = useState(savedCount === null || savedCount === undefined ? '' : String(savedCount));
   const [isCountConfirmationPending, setIsCountConfirmationPending] = useState(false);
+  const [pendingTurn, setPendingTurn] = useState<TurnType | null>(null);
+  const [turnsToDelete, setTurnsToDelete] = useState<OperationalTurn[]>([]);
   const [disabledCauses, setDisabledCauses] = useState<string[]>([]);
   const causesConfirmed = answers[`${officeNumber}__${DISABLED_CAUSE_CONFIRMATION_QUESTION}`]?.value === 1;
   const savedDisabledCauses = DISABLED_OFFICE_CAUSES
@@ -59,6 +62,34 @@ export const OfficeConfigurationPanel: React.FC<OfficeConfigurationPanelProps> =
     }
     setIsCountConfirmationPending(false);
     await handleSaveAnswer(officeNumber, GENERAL_DOCTOR_COUNT_QUESTION, Number(doctorCount));
+  };
+
+  const requestTurnChange = (turn: TurnType) => {
+    if (!turn || turn === currentTurn) return;
+    const removedTurns: OperationalTurn[] = turn === 'Ambos' || !currentTurn
+      ? []
+      : currentTurn === 'Ambos'
+        ? [turn === 'Matutino' ? 'Vespertino' : 'Matutino']
+        : [currentTurn];
+    const hasSavedSchedule = (Object.values(answers) as QuestionAnswer[]).some((answer) =>
+      answer.officeNumber === officeNumber
+      && removedTurns.some((removedTurn) => answer.question.includes(`${removedTurn} - `))
+      && (answer.question.startsWith('¿Opera en este horario? ') || answer.question.startsWith('¿Cuenta con médico general? '))
+    );
+    if (!hasSavedSchedule) {
+      void handleSetTurn(officeNumber, turn);
+      return;
+    }
+    setPendingTurn(turn);
+    setTurnsToDelete(removedTurns);
+  };
+
+  const confirmTurnChange = async () => {
+    if (!pendingTurn) return;
+    const nextTurn = pendingTurn;
+    setPendingTurn(null);
+    setTurnsToDelete([]);
+    await handleSetTurn(officeNumber, nextTurn);
   };
 
   const toggleDisabledCause = (causeKey: string) => {
@@ -168,7 +199,7 @@ export const OfficeConfigurationPanel: React.FC<OfficeConfigurationPanelProps> =
             <button
               key={turn}
               type="button"
-              onClick={() => handleSetTurn(officeNumber, turn)}
+              onClick={() => requestTurnChange(turn)}
               className={`px-1 py-1 text-[9px] font-bold transition-colors ${
                 currentTurn === turn
                   ? 'bg-[#A57F2C] text-black'
@@ -288,6 +319,34 @@ export const OfficeConfigurationPanel: React.FC<OfficeConfigurationPanelProps> =
           ))}
         </div>
       </div>}
+
+      {pendingTurn && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby={`turn-warning-${officeNumber}`}>
+          <div className="w-full max-w-md rounded-md border border-amber-400 bg-[#002F2A] p-5 text-white shadow-2xl">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-6 w-6 text-amber-300" />
+                <h3 id={`turn-warning-${officeNumber}`} className="text-base font-bold">Cambiar turno</h3>
+              </div>
+              <button type="button" onClick={() => setPendingTurn(null)} className="rounded p-1 text-zinc-300 hover:bg-white/10" aria-label="Cancelar cambio de turno">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-sm leading-relaxed text-zinc-200">
+              Tus registros de {turnsToDelete.join(' y ')} se borrarán al cambiar a {pendingTurn}.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setPendingTurn(null)} className="rounded-md border border-white/25 px-3 py-2 text-xs font-bold hover:bg-white/10">
+                CANCELAR
+              </button>
+              <button type="button" onClick={() => void confirmTurnChange()} className="flex items-center gap-1.5 rounded-md bg-rose-600 px-3 py-2 text-xs font-bold text-white hover:bg-rose-500">
+                <Trash2 className="h-4 w-4" />
+                BORRAR Y CAMBIAR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

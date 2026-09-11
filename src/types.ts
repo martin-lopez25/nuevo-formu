@@ -43,7 +43,9 @@ export interface QuestionAnswer {
 export interface UnitGeneralData {
   clues: string;
   entidad?: string;
+  nombreUnidad?: string;
   usuarioNombre?: string;
+  usuarioEmail?: string;
   hasInternet: 'SI' | 'NO' | 'PENDIENTE';
   hasTemporarilyClosedOffices: 'SI' | 'NO' | 'PENDIENTE';
   enabledOffices: number | null;
@@ -70,7 +72,7 @@ export interface EquipmentItem {
 
 export interface SyncQueueItem {
   id: string;
-  action: 'save_answer' | 'save_general' | 'save_turn';
+  action: 'save_answer' | 'save_general' | 'delete_turn_schedules';
   clues: string;
   payload: Record<string, any>;
   timestamp: number;
