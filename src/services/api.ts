@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { MexicanEntity, MedicalUnit, QuestionAnswer, EquipmentItem, SyncQueueItem, UnitGeneralData } from '../types.ts';
+import { TURN_SELECTION_QUESTION } from '../data/officeConfiguration.ts';
 
 const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '') + '/api';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -253,11 +254,17 @@ export async function fetchUnitResponses(clues: string): Promise<{ answers: Reco
     const officeCount = rows.find((row) => row.tipo_registro === 'respuesta' && row.pregunta === 'consultorios');
 
     rows
+      .filter((row) => row.tipo_registro === 'respuesta' && row.pregunta === TURN_SELECTION_QUESTION && row.turno)
+      .forEach((row) => {
+        turns[Number(row.consultorio)] = row.turno;
+      });
+
+    rows
       .filter((row) => row.tipo_registro === 'respuesta' && row.pregunta !== 'consultorios' && row.valor !== null)
       .forEach((row) => {
         const officeNumber = Number(row.consultorio);
         const question = normalizeQuestionName(String(row.pregunta));
-        if (row.turno) turns[officeNumber] = row.turno;
+        if (row.turno && !turns[officeNumber]) turns[officeNumber] = row.turno;
         answers[`${officeNumber}__${question}`] = {
           clues: normalizedClues,
           officeNumber,
@@ -428,12 +435,43 @@ export async function saveUnitGeneral(clues: string, generalData: UnitGeneralDat
 
     for (const [officeNumber, turn] of Object.entries(generalData.turns)) {
       if (!turn) continue;
+      const numericOffice = Number(officeNumber);
+      const turnRow = {
+        fecha_registro: timestamp,
+        tipo_registro: 'respuesta',
+        entidad: generalData.entidad || '',
+        usuario_nombre: generalData.usuarioNombre || '',
+        clues_imb: normalizedClues,
+        internet: null,
+        consultorios_habilitados: null,
+        tiene_consultorios_inoperantes: null,
+        consultorios_inhabilitados: null,
+        total_consultorios_medicina_general: null,
+        consultorio: numericOffice,
+        pregunta: TURN_SELECTION_QUESTION,
+        valor: 1,
+        turno: turn
+      };
+      const existingTurn = await client
+        .from('respuestas')
+        .select('id')
+        .eq('clues_imb', normalizedClues)
+        .eq('tipo_registro', 'respuesta')
+        .eq('consultorio', numericOffice)
+        .eq('pregunta', TURN_SELECTION_QUESTION)
+        .maybeSingle();
+      if (existingTurn.error) throw existingTurn.error;
+      const turnResult = existingTurn.data
+        ? await client.from('respuestas').update(turnRow).eq('id', existingTurn.data.id)
+        : await client.from('respuestas').insert(turnRow);
+      if (turnResult.error) throw turnResult.error;
+
       const { error } = await client
         .from('respuestas')
         .update({ turno: turn, fecha_registro: timestamp })
         .eq('clues_imb', normalizedClues)
         .eq('tipo_registro', 'respuesta')
-        .eq('consultorio', Number(officeNumber))
+        .eq('consultorio', numericOffice)
         .neq('pregunta', 'consultorios');
       if (error) throw error;
     }

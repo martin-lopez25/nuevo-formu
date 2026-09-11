@@ -15,6 +15,12 @@ export const WEEK_DAYS = [
 export const GENERAL_DOCTOR_COUNT_QUESTION = '¿Cuántos médicos generales tiene?';
 export const TURN_SELECTION_QUESTION = 'Seleccione el turno';
 export const OFFICE_ENABLED_QUESTION = '¿Está habilitado?';
+export const DISABLED_CAUSE_CONFIRMATION_QUESTION = 'Causas de inhabilitación confirmadas';
+export const DISABLED_OFFICE_CAUSES = [
+  { key: 'infraestructura', label: 'Infraestructura', question: 'Causa de inhabilitación: Infraestructura' },
+  { key: 'equipamiento', label: 'Equipamiento', question: 'Causa de inhabilitación: Equipamiento' },
+  { key: 'recursos_humanos', label: 'Recursos Humanos', question: 'Causa de inhabilitación: Recursos Humanos' }
+] as const;
 
 export function getOperationalTurns(turn: TurnType): OperationalTurn[] {
   if (turn === 'Ambos') return ['Matutino', 'Vespertino'];
@@ -27,11 +33,22 @@ export function getDoctorAvailabilityQuestion(turn: OperationalTurn, day: string
   return `¿Cuenta con médico general? ${turn} - ${day}`;
 }
 
+export function getOfficeScheduleQuestion(turn: OperationalTurn, day: string) {
+  return `¿Opera en este horario? ${turn} - ${day}`;
+}
+
 export function isDoctorAvailabilityQuestion(question: string) {
   return question.startsWith('¿Cuenta con médico general? ');
 }
 
+export function isOfficeScheduleQuestion(question: string) {
+  return question.startsWith('¿Opera en este horario? ');
+}
+
 export function getRequiredOfficeConfigurationQuestions(turn: TurnType, isEnabled?: number | null) {
+  if (isEnabled === 0) {
+    return [OFFICE_ENABLED_QUESTION, DISABLED_CAUSE_CONFIRMATION_QUESTION];
+  }
   if (isEnabled !== 1) return [OFFICE_ENABLED_QUESTION];
 
   return [
@@ -39,7 +56,10 @@ export function getRequiredOfficeConfigurationQuestions(turn: TurnType, isEnable
     TURN_SELECTION_QUESTION,
     GENERAL_DOCTOR_COUNT_QUESTION,
     ...getOperationalTurns(turn).flatMap((operationalTurn) =>
-      WEEK_DAYS.map((day) => getDoctorAvailabilityQuestion(operationalTurn, day.key))
+      WEEK_DAYS.flatMap((day) => [
+        getOfficeScheduleQuestion(operationalTurn, day.key),
+        getDoctorAvailabilityQuestion(operationalTurn, day.key)
+      ])
     )
   ];
 }

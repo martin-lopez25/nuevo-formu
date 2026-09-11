@@ -2,8 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Check, Save, Stethoscope } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
 import {
+  DISABLED_CAUSE_CONFIRMATION_QUESTION,
+  DISABLED_OFFICE_CAUSES,
   GENERAL_DOCTOR_COUNT_QUESTION,
   getDoctorAvailabilityQuestion,
+  getOfficeScheduleQuestion,
   getOperationalTurns,
   OFFICE_ENABLED_QUESTION,
   WEEK_DAYS
@@ -30,11 +33,23 @@ export const OfficeConfigurationPanel: React.FC<OfficeConfigurationPanelProps> =
   const savedCount = answers[countKey]?.value;
   const [doctorCount, setDoctorCount] = useState(savedCount === null || savedCount === undefined ? '' : String(savedCount));
   const [isCountConfirmationPending, setIsCountConfirmationPending] = useState(false);
+  const [disabledCauses, setDisabledCauses] = useState<string[]>([]);
+  const causesConfirmed = answers[`${officeNumber}__${DISABLED_CAUSE_CONFIRMATION_QUESTION}`]?.value === 1;
+  const savedDisabledCauses = DISABLED_OFFICE_CAUSES
+    .filter((cause) => answers[`${officeNumber}__${cause.question}`]?.value === 1)
+    .map((cause) => cause.key);
+  const causesAreSaved = causesConfirmed
+    && disabledCauses.length === savedDisabledCauses.length
+    && disabledCauses.every((cause) => savedDisabledCauses.includes(cause));
 
   useEffect(() => {
     setDoctorCount(savedCount === null || savedCount === undefined ? '' : String(savedCount));
     setIsCountConfirmationPending(false);
   }, [savedCount]);
+
+  useEffect(() => {
+    setDisabledCauses(savedDisabledCauses);
+  }, [answers, officeNumber]);
 
   const saveDoctorCount = async () => {
     if (doctorCount === '') return;
@@ -44,6 +59,26 @@ export const OfficeConfigurationPanel: React.FC<OfficeConfigurationPanelProps> =
     }
     setIsCountConfirmationPending(false);
     await handleSaveAnswer(officeNumber, GENERAL_DOCTOR_COUNT_QUESTION, Number(doctorCount));
+  };
+
+  const toggleDisabledCause = (causeKey: string) => {
+    setDisabledCauses((current) => current.includes(causeKey)
+      ? current.filter((key) => key !== causeKey)
+      : [...current, causeKey]);
+  };
+
+  const saveDisabledCauses = async () => {
+    if (disabledCauses.length === 0) return;
+    await handleSaveAnswer(officeNumber, DISABLED_CAUSE_CONFIRMATION_QUESTION, 0, true);
+    for (const cause of DISABLED_OFFICE_CAUSES) {
+      await handleSaveAnswer(
+        officeNumber,
+        cause.question,
+        disabledCauses.includes(cause.key) ? 1 : 0,
+        true
+      );
+    }
+    await handleSaveAnswer(officeNumber, DISABLED_CAUSE_CONFIRMATION_QUESTION, 1, true);
   };
 
   return (
@@ -80,6 +115,49 @@ export const OfficeConfigurationPanel: React.FC<OfficeConfigurationPanelProps> =
           {isDisabled
             ? 'Consultorio no habilitado. La captura de este consultorio está bloqueada.'
             : 'Seleccione Sí para habilitar la captura de este consultorio.'}
+        </div>
+      )}
+
+      {isDisabled && (
+        <div className="space-y-1.5 rounded-md border border-rose-400/40 bg-rose-950/35 p-2">
+          <p className="text-[9px] font-bold leading-snug text-rose-100">
+            ¿Cuál es la causa por la que el consultorio {officeNumber} no se encuentra habilitado?
+          </p>
+          <p className="text-[8px] text-rose-200/80">Seleccione una o más opciones:</p>
+          <div className="grid grid-cols-3 gap-1">
+            {DISABLED_OFFICE_CAUSES.map((cause) => {
+              const isSelected = disabledCauses.includes(cause.key);
+              return (
+                <button
+                  key={cause.key}
+                  type="button"
+                  onClick={() => toggleDisabledCause(cause.key)}
+                  aria-pressed={isSelected}
+                  className={`flex min-h-8 items-center justify-center gap-1 rounded-md border px-1 py-1 text-center text-[8px] font-bold leading-tight transition-colors ${
+                    isSelected
+                      ? 'border-amber-200 bg-[#A57F2C] text-black'
+                      : 'border-white/20 bg-black/20 text-zinc-200 hover:bg-white/10'
+                  }`}
+                >
+                  <span className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border ${
+                    isSelected ? 'border-black/40 bg-black/10' : 'border-white/40'
+                  }`}>
+                    {isSelected && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
+                  </span>
+                  {cause.label}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={saveDisabledCauses}
+            disabled={disabledCauses.length === 0}
+            className="flex w-full items-center justify-center gap-1 rounded-md bg-[#A57F2C] px-2 py-1 text-[8px] font-extrabold text-black transition-colors hover:bg-[#b88f33] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {causesAreSaved ? <Check className="h-3 w-3" /> : <Save className="h-3 w-3" />}
+            {causesAreSaved ? 'CAUSAS GUARDADAS' : 'GUARDAR CAUSAS'}
+          </button>
         </div>
       )}
 
@@ -146,8 +224,8 @@ export const OfficeConfigurationPanel: React.FC<OfficeConfigurationPanelProps> =
 
       {isEnabled && currentTurn && <div>
         <div className="mb-1 flex items-center justify-between gap-2">
-          <p className="text-[9px] font-bold text-emerald-100">¿Cuenta con médico general?</p>
-          <p className="text-[8px] text-zinc-300">Vacío: No · ✓: Sí</p>
+          <p className="text-[9px] font-bold text-emerald-100">Horario y médico general</p>
+          <p className="text-[8px] text-zinc-300">□ Horario · ○ Médico</p>
         </div>
         <div className="overflow-hidden rounded-md border border-white/15">
           <div className="grid grid-cols-[55px_repeat(7,1fr)] bg-[#002F2A] text-center text-[8px] font-bold text-amber-200">
@@ -158,18 +236,35 @@ export const OfficeConfigurationPanel: React.FC<OfficeConfigurationPanelProps> =
             <div key={turn} className="grid grid-cols-[55px_repeat(7,1fr)] items-center border-t border-white/10">
               <span className="px-1 text-[8px] font-semibold text-zinc-200">{turn === 'Vespertino' ? 'Vesp.' : 'Mat.'}</span>
               {WEEK_DAYS.map((day) => {
+                const scheduleQuestion = getOfficeScheduleQuestion(turn, day.key);
+                const hasSchedule = answers[`${officeNumber}__${scheduleQuestion}`]?.value === 1;
                 const question = getDoctorAvailabilityQuestion(turn, day.key);
                 const value = answers[`${officeNumber}__${question}`]?.value;
-                const hasDoctor = value === 1;
+                const hasDoctor = hasSchedule && value === 1;
                 return (
-                  <div key={day.key} className="flex justify-center border-l border-white/10 py-1">
+                  <div key={day.key} className="flex items-center justify-center gap-1 border-l border-white/10 py-1">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveAnswer(officeNumber, scheduleQuestion, hasSchedule ? 0 : 1, true)}
+                      title={`${day.key}: ${hasSchedule ? 'Horario asignado' : 'Sin horario'}`}
+                      aria-label={`${turn}, ${day.key}: ${hasSchedule ? 'Horario asignado' : 'Sin horario'}`}
+                      aria-pressed={hasSchedule}
+                      className={`flex h-5 w-5 items-center justify-center rounded-sm border transition-colors ${
+                        hasSchedule
+                          ? 'border-amber-200 bg-[#A57F2C] text-black'
+                          : 'border-white/35 bg-black/30 text-transparent hover:border-white/60 hover:bg-white/10'
+                      }`}
+                    >
+                      <Check className="h-3 w-3" strokeWidth={3} />
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleSaveAnswer(officeNumber, question, hasDoctor ? 0 : 1, true)}
-                      title={`${day.key}: ${hasDoctor ? 'Sí' : 'No'}`}
-                      aria-label={`${turn}, ${day.key}: ${hasDoctor ? 'Sí' : 'No'}`}
+                      disabled={!hasSchedule}
+                      title={hasSchedule ? `${day.key}: ${hasDoctor ? 'Con médico' : 'Sin médico'}` : 'Asigne primero el horario'}
+                      aria-label={`${turn}, ${day.key}: ${hasDoctor ? 'Con médico' : 'Sin médico'}`}
                       aria-pressed={hasDoctor}
-                      className={`flex h-5 w-5 items-center justify-center rounded-full border transition-colors ${
+                      className={`flex h-5 w-5 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-25 ${
                         hasDoctor
                           ? 'border-emerald-200 bg-emerald-500 text-emerald-950 shadow-[0_0_10px_rgba(52,211,153,0.45)]'
                           : 'border-white/35 bg-black/30 text-transparent hover:border-white/60 hover:bg-white/10'

@@ -91,6 +91,15 @@ create unique index if not exists respuestas_celda_uidx
 
 create index if not exists respuestas_clues_idx on public.respuestas (clues_imb);
 
+comment on column public.respuestas.consultorio is
+  'Número de consultorio. La configuración y el equipamiento se almacenan como respuestas por consultorio.';
+
+comment on column public.respuestas.pregunta is
+  'Clave estable de equipo o configuración: habilitación, turno, médicos, horario semanal o causa de inhabilitación.';
+
+comment on column public.respuestas.turno is
+  'Turno operativo del consultorio. La fila Seleccione el turno es la fuente principal al recargar.';
+
 create or replace function public.proteger_borrado_respuestas()
 returns trigger
 language plpgsql

@@ -30,8 +30,10 @@ import {
 } from '../services/api.ts';
 import { EQUIPMENT_CATALOG } from '../data/equipmentCatalog.ts';
 import {
+  DISABLED_CAUSE_CONFIRMATION_QUESTION,
   getRequiredOfficeConfigurationQuestions,
   isDoctorAvailabilityQuestion,
+  isOfficeScheduleQuestion,
   OFFICE_ENABLED_QUESTION,
   TURN_SELECTION_QUESTION
 } from '../data/officeConfiguration.ts';
@@ -133,7 +135,10 @@ function isQuestionnaireComplete(
     ];
     return requiredQuestions.every((question) => {
       if (question === TURN_SELECTION_QUESTION) return Boolean(data.turns[officeNumber]);
-      if (isDoctorAvailabilityQuestion(question)) return true;
+      if (question === DISABLED_CAUSE_CONFIRMATION_QUESTION) {
+        return currentAnswers[`${officeNumber}__${question}`]?.value === 1;
+      }
+      if (isDoctorAvailabilityQuestion(question) || isOfficeScheduleQuestion(question)) return true;
       const answer = currentAnswers[`${officeNumber}__${question}`];
       return answer?.value !== null && answer?.value !== undefined;
     });
@@ -612,7 +617,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       question,
       value,
       status: 'saving',
-      turn: generalData.turns[officeNumber] || 'Matutino',
+      turn: generalData.turns[officeNumber] || '',
       updatedAt: new Date().toISOString(),
       version: (previous?.version || 0) + 1
     };
@@ -634,7 +639,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       numeroConsultorio: officeNumber,
       pregunta: question,
       valor: value,
-      turno: generalData.turns[officeNumber] || 'Matutino',
+      turno: generalData.turns[officeNumber] || '',
       version: newAnswer.version
     };
 
@@ -732,7 +737,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         return count;
       }
-      if (isDoctorAvailabilityQuestion(question)) {
+      if (question === DISABLED_CAUSE_CONFIRMATION_QUESTION) {
+        if (answers[`${c}__${question}`]?.value === 1) {
+          answeredCount++;
+          return count + 1;
+        }
+        return count;
+      }
+      if (isDoctorAvailabilityQuestion(question) || isOfficeScheduleQuestion(question)) {
         answeredCount++;
         return count + 1;
       }
