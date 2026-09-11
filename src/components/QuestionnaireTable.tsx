@@ -38,7 +38,7 @@ export const QuestionnaireTable: React.FC<QuestionnaireTableProps> = ({ tableCon
             TABLA DINÁMICA DE CAPTURA
           </span>
           <h3 className="text-sm sm:text-base font-bold text-white leading-tight drop-shadow">
-            Catálogo de Equipamiento Médico ({EQUIPMENT_CATALOG.length} Preguntas)
+            OPERACIÓN Y EQUIPAMIENTO DE CONSULTORIOS DE MEDICINA GENERAL
           </h3>
         </div>
         <div className="text-xs text-amber-300/90 font-mono hidden sm:block">

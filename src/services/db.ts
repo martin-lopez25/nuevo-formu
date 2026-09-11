@@ -130,6 +130,41 @@ export async function getLocalAnswersForUnit(clues: string): Promise<Record<stri
   return result;
 }
 
+export async function replaceLocalAnswersForUnit(
+  clues: string,
+  answers: Record<string, QuestionAnswer>
+): Promise<void> {
+  const normClues = clues.trim().toUpperCase();
+  const db = await getDB();
+  if (!db.transaction) return;
+
+  const tx = db.transaction('answers', 'readwrite');
+  const store = tx.objectStore('answers');
+  const request = store.index('clues').openCursor(IDBKeyRange.only(normClues));
+
+  request.onsuccess = (event) => {
+    const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result;
+    if (cursor) {
+      cursor.delete();
+      cursor.continue();
+      return;
+    }
+
+    Object.values(answers).forEach((answer) => {
+      store.put({
+        ...answer,
+        clues: normClues,
+        key: makeAnswerKey(normClues, answer.officeNumber, answer.question)
+      });
+    });
+  };
+
+  await new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 export async function deleteLocalAnswersForUnit(clues: string): Promise<void> {
   const normClues = clues.trim().toUpperCase();
   const db = await getDB();

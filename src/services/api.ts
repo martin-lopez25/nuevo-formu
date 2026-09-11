@@ -1,6 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 import { MexicanEntity, MedicalUnit, QuestionAnswer, EquipmentItem, SyncQueueItem, UnitGeneralData } from '../types.ts';
-import { TURN_SELECTION_QUESTION } from '../data/officeConfiguration.ts';
+import {
+  DISABLED_CAUSE_CONFIRMATION_QUESTION,
+  DISABLED_OFFICE_CAUSES,
+  GENERAL_DOCTOR_COUNT_QUESTION,
+  getDisabledCauseFromQuestion,
+  getDoctorAvailabilityQuestion,
+  getOfficeScheduleQuestion,
+  OFFICE_ENABLED_QUESTION,
+  parseDoctorAvailabilityQuestion,
+  parseOfficeScheduleQuestion,
+  type OperationalTurn
+} from '../data/officeConfiguration.ts';
 
 const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '') + '/api';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -22,6 +33,31 @@ function requireSupabase() {
   return supabase;
 }
 
+type ScheduleEntry = { turno: OperationalTurn; dia: string; existe_medico: boolean };
+type StoredSchedules = Partial<Record<OperationalTurn, {
+  dias_con_horario: string[];
+  dias_con_medico: string[];
+}>>;
+
+function parseStoredSchedules(value: unknown): ScheduleEntry[] {
+  if (Array.isArray(value)) return value as ScheduleEntry[];
+  if (!value || typeof value !== 'object') return [];
+
+  return Object.entries(value as StoredSchedules).flatMap(([turno, schedule]) =>
+    (schedule?.dias_con_horario || []).map((dia) => ({
+      turno: turno as OperationalTurn,
+      dia,
+      existe_medico: schedule?.dias_con_medico?.includes(dia) || false
+    }))
+  );
+}
+
+function parseStoredCauses(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((cause): cause is string => typeof cause === 'string');
+  if (typeof value !== 'string') return [];
+  return value.split(',').map((cause) => cause.trim()).filter(Boolean);
+}
+
 function answerRow(payload: Parameters<typeof saveSingleAnswer>[0]) {
   return {
     fecha_registro: new Date().toISOString(),
@@ -31,20 +67,113 @@ function answerRow(payload: Parameters<typeof saveSingleAnswer>[0]) {
     usuario_email: payload.usuarioEmail,
     clues_imb: payload.clues.trim().toUpperCase(),
     nombre_de_la_unidad: payload.nombreUnidad,
-    internet: null,
-    consultorios_habilitados: null,
-    tiene_consultorios_inoperantes: null,
-    consultorios_inhabilitados: null,
-    total_consultorios_medicina_general: null,
     consultorio: payload.numeroConsultorio,
     pregunta: payload.pregunta.trim(),
     valor: payload.valor,
-    turno: payload.turno || null
+    turno: null
   };
 }
 
 async function saveAnswerRow(payload: Parameters<typeof saveSingleAnswer>[0]) {
   const client = requireSupabase();
+  const normalizedClues = payload.clues.trim().toUpperCase();
+  const cause = getDisabledCauseFromQuestion(payload.pregunta);
+  const schedule = parseOfficeScheduleQuestion(payload.pregunta);
+  const doctorAvailability = parseDoctorAvailabilityQuestion(payload.pregunta);
+
+  if (schedule || doctorAvailability) {
+    const slot = schedule || doctorAvailability!;
+    const turnAndDay = `${slot.turn} - ${slot.day}`;
+    const timestamp = new Date().toISOString();
+    const existing = await client.from('respuestas').select('*')
+      .eq('clues_imb', normalizedClues)
+      .eq('tipo_registro', 'horario')
+      .eq('consultorio', payload.numeroConsultorio)
+      .eq('turno', turnAndDay)
+      .maybeSingle();
+    if (existing.error) throw existing.error;
+
+    const row = {
+      fecha_registro: timestamp,
+      tipo_registro: 'horario',
+      entidad: payload.entidad,
+      usuario_nombre: payload.usuarioNombre,
+      usuario_email: payload.usuarioEmail,
+      clues_imb: normalizedClues,
+      nombre_de_la_unidad: payload.nombreUnidad,
+      consultorio: payload.numeroConsultorio,
+      pregunta: null,
+      valor: null,
+      turno: turnAndDay,
+      habilitado: schedule ? payload.valor === 1 : existing.data?.habilitado ?? false,
+      causas_inhabilitacion: '',
+      medicos_generales: null,
+      medico_disponible: doctorAvailability ? payload.valor === 1 : existing.data?.medico_disponible ?? false
+    };
+    const result = existing.data
+      ? await client.from('respuestas').update(row).eq('id', existing.data.id)
+      : await client.from('respuestas').insert(row);
+    if (result.error) throw result.error;
+    return timestamp;
+  }
+
+  const isOfficeConfiguration = payload.pregunta === OFFICE_ENABLED_QUESTION
+    || payload.pregunta === GENERAL_DOCTOR_COUNT_QUESTION
+    || payload.pregunta === DISABLED_CAUSE_CONFIRMATION_QUESTION
+    || Boolean(cause);
+
+  if (isOfficeConfiguration) {
+    const timestamp = new Date().toISOString();
+    const existing = await client.from('respuestas').select('*')
+      .eq('clues_imb', normalizedClues)
+      .eq('tipo_registro', 'consultorio')
+      .eq('consultorio', payload.numeroConsultorio)
+      .maybeSingle();
+    if (existing.error) throw existing.error;
+    if (payload.pregunta === DISABLED_CAUSE_CONFIRMATION_QUESTION) return timestamp;
+
+    const selectedCauses = new Set<string>(parseStoredCauses(existing.data?.causas_inhabilitacion));
+    if (cause) {
+      if (payload.valor === 1) selectedCauses.add(cause.label);
+      else selectedCauses.delete(cause.label);
+    }
+
+    const enabled = payload.pregunta === OFFICE_ENABLED_QUESTION
+      ? payload.valor === 1
+      : existing.data?.habilitado ?? null;
+    const row = {
+      fecha_registro: timestamp,
+      tipo_registro: 'consultorio',
+      entidad: payload.entidad,
+      usuario_nombre: payload.usuarioNombre,
+      usuario_email: payload.usuarioEmail,
+      clues_imb: normalizedClues,
+      nombre_de_la_unidad: payload.nombreUnidad,
+      consultorio: payload.numeroConsultorio,
+      pregunta: null,
+      valor: null,
+      turno: enabled === false ? null : existing.data?.turno || payload.turno || null,
+      habilitado: enabled,
+      causas_inhabilitacion: enabled === true ? '' : [...selectedCauses].join(', '),
+      medicos_generales: enabled === false
+        ? null
+        : payload.pregunta === GENERAL_DOCTOR_COUNT_QUESTION ? payload.valor : existing.data?.medicos_generales ?? null
+    };
+    const result = existing.data
+      ? await client.from('respuestas').update(row).eq('id', existing.data.id)
+      : await client.from('respuestas').insert(row);
+    if (result.error) throw result.error;
+    if (payload.pregunta === OFFICE_ENABLED_QUESTION && !enabled) {
+      const disabledSchedules = await client.from('respuestas')
+        .update({ habilitado: false, medico_disponible: false, fecha_registro: timestamp })
+        .eq('clues_imb', normalizedClues)
+        .eq('tipo_registro', 'horario')
+        .eq('consultorio', payload.numeroConsultorio);
+      if (disabledSchedules.error) throw disabledSchedules.error;
+    }
+    return timestamp;
+  }
+
   const row = answerRow(payload);
   const query = client
     .from('respuestas')
@@ -76,7 +205,7 @@ export interface ApiResponse<T = any> {
 export interface AdminResponseRow {
   id: number;
   fecha_registro: string;
-  tipo_registro: 'unidad' | 'respuesta';
+  tipo_registro: 'unidad' | 'respuesta' | 'consultorio' | 'horario';
   entidad: string | null;
   usuario_nombre: string | null;
   usuario_email: string | null;
@@ -84,7 +213,6 @@ export interface AdminResponseRow {
   nombre_de_la_unidad: string | null;
   internet: string | null;
   consultorios_habilitados: number | null;
-  tiene_consultorios_inoperantes: string | null;
   consultorios_inhabilitados: number | null;
   total_consultorios_medicina_general: number | null;
   consultorio: number | null;
@@ -146,7 +274,7 @@ export async function fetchAdminResponses(token: string): Promise<AdminResponseR
 
 export async function checkServerHealth(): Promise<boolean> {
   if (supabase) {
-    const { error } = await supabase.from('respuestas').select('id', { head: true, count: 'exact' }).limit(1);
+    const { error } = await supabase.from('respuestas').select('id').limit(1);
     return !error;
   }
 
@@ -241,37 +369,112 @@ export async function fetchUnitResponses(clues: string): Promise<{ answers: Reco
 
   if (supabase) {
     const normalizedClues = clues.trim().toUpperCase();
-    const { data, error } = await supabase
-      .from('respuestas')
-      .select('*')
-      .eq('clues_imb', normalizedClues);
-    if (error) throw error;
+    const responseResult = await supabase.from('respuestas').select('*').eq('clues_imb', normalizedClues);
+    if (responseResult.error) throw responseResult.error;
 
     const answers: Record<string, QuestionAnswer> = {};
     const turns: UnitGeneralData['turns'] = {};
-    const rows = data || [];
+    const rows = responseResult.data || [];
     const config = rows.find((row) => row.tipo_registro === 'unidad');
-    const officeCount = rows.find((row) => row.tipo_registro === 'respuesta' && row.pregunta === 'consultorios');
+    const legacyOfficeCount = rows.find((row) => row.tipo_registro === 'respuesta' && row.pregunta === 'consultorios');
 
-    rows
-      .filter((row) => row.tipo_registro === 'respuesta' && row.pregunta === TURN_SELECTION_QUESTION && row.turno)
-      .forEach((row) => {
-        turns[Number(row.consultorio)] = row.turno;
+    rows.filter((row) => row.tipo_registro === 'consultorio').forEach((office) => {
+      const officeNumber = Number(office.consultorio);
+      const updatedAt = office.fecha_registro || new Date().toISOString();
+      if (office.habilitado !== null) {
+        answers[`${officeNumber}__${OFFICE_ENABLED_QUESTION}`] = {
+          clues: normalizedClues,
+          officeNumber,
+          question: OFFICE_ENABLED_QUESTION,
+          value: office.habilitado ? 1 : 0,
+          status: 'saved_cloud',
+          turn: office.turno || '',
+          updatedAt
+        };
+      }
+      if (office.turno) turns[officeNumber] = office.turno;
+      if (office.medicos_generales !== null) {
+        answers[`${officeNumber}__${GENERAL_DOCTOR_COUNT_QUESTION}`] = {
+          clues: normalizedClues,
+          officeNumber,
+          question: GENERAL_DOCTOR_COUNT_QUESTION,
+          value: Number(office.medicos_generales),
+          status: 'saved_cloud',
+          turn: office.turno || '',
+          updatedAt
+        };
+      }
+      const selectedCauses = new Set<string>(parseStoredCauses(office.causas_inhabilitacion));
+      DISABLED_OFFICE_CAUSES.forEach((cause) => {
+        if (!selectedCauses.has(cause.label)) return;
+        answers[`${officeNumber}__${cause.question}`] = {
+          clues: normalizedClues,
+          officeNumber,
+          question: cause.question,
+          value: 1,
+          status: 'saved_cloud',
+          turn: office.turno || '',
+          updatedAt
+        };
       });
+      if (selectedCauses.size > 0) {
+        answers[`${officeNumber}__${DISABLED_CAUSE_CONFIRMATION_QUESTION}`] = {
+          clues: normalizedClues,
+          officeNumber,
+          question: DISABLED_CAUSE_CONFIRMATION_QUESTION,
+          value: 1,
+          status: 'saved_cloud',
+          turn: office.turno || '',
+          updatedAt
+        };
+      }
+      parseStoredSchedules(office.horarios).forEach((schedule) => {
+        const scheduleQuestion = getOfficeScheduleQuestion(schedule.turno, schedule.dia);
+        const doctorQuestion = getDoctorAvailabilityQuestion(schedule.turno, schedule.dia);
+        answers[`${officeNumber}__${scheduleQuestion}`] = {
+          clues: normalizedClues, officeNumber, question: scheduleQuestion, value: 1,
+          status: 'saved_cloud', turn: schedule.turno, updatedAt
+        };
+        answers[`${officeNumber}__${doctorQuestion}`] = {
+          clues: normalizedClues, officeNumber, question: doctorQuestion,
+          value: schedule.existe_medico ? 1 : 0,
+          status: 'saved_cloud', turn: schedule.turno, updatedAt
+        };
+      });
+    });
+
+    rows.filter((row) => row.tipo_registro === 'horario' && row.habilitado).forEach((scheduleRow) => {
+      const officeNumber = Number(scheduleRow.consultorio);
+      const match = String(scheduleRow.turno || '').match(/^(Matutino|Vespertino) - (.+)$/);
+      if (!match) return;
+      const operationalTurn = match[1] as OperationalTurn;
+      const day = match[2];
+      const updatedAt = scheduleRow.fecha_registro || new Date().toISOString();
+      const scheduleQuestion = getOfficeScheduleQuestion(operationalTurn, day);
+      const doctorQuestion = getDoctorAvailabilityQuestion(operationalTurn, day);
+      answers[`${officeNumber}__${scheduleQuestion}`] = {
+        clues: normalizedClues, officeNumber, question: scheduleQuestion, value: 1,
+        status: 'saved_cloud', turn: operationalTurn, updatedAt
+      };
+      answers[`${officeNumber}__${doctorQuestion}`] = {
+        clues: normalizedClues, officeNumber, question: doctorQuestion,
+        value: scheduleRow.medico_disponible ? 1 : 0,
+        status: 'saved_cloud', turn: operationalTurn, updatedAt
+      };
+    });
 
     rows
       .filter((row) => row.tipo_registro === 'respuesta' && row.pregunta !== 'consultorios' && row.valor !== null)
       .forEach((row) => {
         const officeNumber = Number(row.consultorio);
         const question = normalizeQuestionName(String(row.pregunta));
-        if (row.turno && !turns[officeNumber]) turns[officeNumber] = row.turno;
         answers[`${officeNumber}__${question}`] = {
           clues: normalizedClues,
           officeNumber,
           question,
           value: row.valor === null ? null : Number(row.valor),
           status: 'saved_cloud',
-          turn: row.turno || '',
+          turn: '',
           updatedAt: row.fecha_registro || new Date().toISOString(),
           version: 1
         };
@@ -282,13 +485,17 @@ export async function fetchUnitResponses(clues: string): Promise<{ answers: Reco
       entidad: config.entidad || '',
       usuarioNombre: config.usuario_nombre || '',
       hasInternet: config.internet || 'PENDIENTE',
-      hasTemporarilyClosedOffices: config.tiene_consultorios_inoperantes || 'PENDIENTE',
+      hasTemporarilyClosedOffices: config.consultorios_inhabilitados === null
+        ? 'PENDIENTE'
+        : Number(config.consultorios_inhabilitados) > 0 ? 'SI' : 'NO',
       enabledOffices: config.consultorios_habilitados === null ? null : Number(config.consultorios_habilitados),
       unoperatedOffices: config.consultorios_inhabilitados === null ? null : Number(config.consultorios_inhabilitados),
       totalGeneralOffices: config.total_consultorios_medicina_general === null
         ? null
         : Number(config.total_consultorios_medicina_general),
-      configuredOffices: officeCount ? Number(officeCount.consultorio) : null,
+      configuredOffices: config.consultorios === null || config.consultorios === undefined
+        ? legacyOfficeCount ? Number(legacyOfficeCount.consultorio) : null
+        : Number(config.consultorios),
       turns,
       updatedAt: config.fecha_registro || new Date().toISOString()
     } satisfies UnitGeneralData : undefined;
@@ -392,31 +599,14 @@ export async function saveUnitGeneral(clues: string, generalData: UnitGeneralDat
       clues_imb: normalizedClues,
       internet: generalData.hasInternet,
       consultorios_habilitados: generalData.enabledOffices,
-      tiene_consultorios_inoperantes: generalData.hasTemporarilyClosedOffices,
       consultorios_inhabilitados: generalData.unoperatedOffices,
       total_consultorios_medicina_general: generalData.totalGeneralOffices,
+      consultorios: generalData.configuredOffices,
       consultorio: null,
       pregunta: null,
       valor: null,
       turno: null
     };
-    const countRow = {
-      fecha_registro: timestamp,
-      tipo_registro: 'respuesta',
-      entidad: generalData.entidad || '',
-      usuario_nombre: generalData.usuarioNombre || '',
-      clues_imb: normalizedClues,
-      internet: null,
-      consultorios_habilitados: null,
-      tiene_consultorios_inoperantes: null,
-      consultorios_inhabilitados: null,
-      total_consultorios_medicina_general: null,
-      consultorio: generalData.configuredOffices,
-      pregunta: 'consultorios',
-      valor: null,
-      turno: null
-    };
-
     const existingConfig = await client.from('respuestas').select('id').eq('clues_imb', normalizedClues).eq('tipo_registro', 'unidad').maybeSingle();
     if (existingConfig.error) throw existingConfig.error;
     const configResult = existingConfig.data
@@ -424,56 +614,47 @@ export async function saveUnitGeneral(clues: string, generalData: UnitGeneralDat
       : await client.from('respuestas').insert(configRow);
     if (configResult.error) throw configResult.error;
 
-    if (generalData.configuredOffices !== null) {
-      const existingCount = await client.from('respuestas').select('id').eq('clues_imb', normalizedClues).eq('tipo_registro', 'respuesta').eq('pregunta', 'consultorios').maybeSingle();
-      if (existingCount.error) throw existingCount.error;
-      const countResult = existingCount.data
-        ? await client.from('respuestas').update(countRow).eq('id', existingCount.data.id)
-        : await client.from('respuestas').insert(countRow);
-      if (countResult.error) throw countResult.error;
-    }
-
     for (const [officeNumber, turn] of Object.entries(generalData.turns)) {
       if (!turn) continue;
       const numericOffice = Number(officeNumber);
-      const turnRow = {
+      const existingOffice = await client.from('respuestas').select('*')
+        .eq('clues_imb', normalizedClues)
+        .eq('tipo_registro', 'consultorio')
+        .eq('consultorio', numericOffice)
+        .maybeSingle();
+      if (existingOffice.error) throw existingOffice.error;
+      const officeRow = {
         fecha_registro: timestamp,
-        tipo_registro: 'respuesta',
+        tipo_registro: 'consultorio',
         entidad: generalData.entidad || '',
         usuario_nombre: generalData.usuarioNombre || '',
+        usuario_email: existingOffice.data?.usuario_email || null,
         clues_imb: normalizedClues,
-        internet: null,
-        consultorios_habilitados: null,
-        tiene_consultorios_inoperantes: null,
-        consultorios_inhabilitados: null,
-        total_consultorios_medicina_general: null,
+        nombre_de_la_unidad: existingOffice.data?.nombre_de_la_unidad || null,
         consultorio: numericOffice,
-        pregunta: TURN_SELECTION_QUESTION,
-        valor: 1,
-        turno: turn
+        pregunta: null,
+        valor: null,
+        turno: turn,
+        habilitado: existingOffice.data?.habilitado ?? null,
+        causas_inhabilitacion: typeof existingOffice.data?.causas_inhabilitacion === 'string'
+          ? existingOffice.data.causas_inhabilitacion
+          : parseStoredCauses(existingOffice.data?.causas_inhabilitacion).join(', '),
+        medicos_generales: existingOffice.data?.medicos_generales ?? null
       };
-      const existingTurn = await client
-        .from('respuestas')
-        .select('id')
-        .eq('clues_imb', normalizedClues)
-        .eq('tipo_registro', 'respuesta')
-        .eq('consultorio', numericOffice)
-        .eq('pregunta', TURN_SELECTION_QUESTION)
-        .maybeSingle();
-      if (existingTurn.error) throw existingTurn.error;
-      const turnResult = existingTurn.data
-        ? await client.from('respuestas').update(turnRow).eq('id', existingTurn.data.id)
-        : await client.from('respuestas').insert(turnRow);
+      const turnResult = existingOffice.data
+        ? await client.from('respuestas').update(officeRow).eq('id', existingOffice.data.id)
+        : await client.from('respuestas').insert(officeRow);
       if (turnResult.error) throw turnResult.error;
 
-      const { error } = await client
-        .from('respuestas')
-        .update({ turno: turn, fecha_registro: timestamp })
-        .eq('clues_imb', normalizedClues)
-        .eq('tipo_registro', 'respuesta')
-        .eq('consultorio', numericOffice)
-        .neq('pregunta', 'consultorios');
-      if (error) throw error;
+      if (turn === 'Matutino' || turn === 'Vespertino') {
+        const incompatibleSchedules = await client.from('respuestas')
+          .update({ habilitado: false, medico_disponible: false, fecha_registro: timestamp })
+          .eq('clues_imb', normalizedClues)
+          .eq('tipo_registro', 'horario')
+          .eq('consultorio', numericOffice)
+          .not('turno', 'like', `${turn} - %`);
+        if (incompatibleSchedules.error) throw incompatibleSchedules.error;
+      }
     }
 
     return { success: true, message: 'Configuración general guardada', data: generalData, serverTimestamp: timestamp };

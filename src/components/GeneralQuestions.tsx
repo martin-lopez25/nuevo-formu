@@ -57,7 +57,7 @@ export const GeneralQuestions: React.FC<GeneralQuestionsProps> = ({ onScrollToQu
         <div className="flex items-center gap-2 border-b border-white/20 pb-2.5">
           <Sliders className="w-4 h-4 text-[#A57F2C]" />
           <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-white drop-shadow-sm">
-            Características y Configuración de Consultorios de Medicina General
+            CARACTERÍSTICAS DE LA UNIDAD MÉDICA
           </h3>
         </div>
 

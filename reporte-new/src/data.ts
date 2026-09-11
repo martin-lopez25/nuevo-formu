@@ -19,7 +19,6 @@ interface SupabaseRow {
   nombre_de_la_unidad: string | null;
   internet: string | null;
   consultorios_habilitados: number | null;
-  tiene_consultorios_inoperantes: string | null;
   consultorios_inhabilitados: number | null;
   total_consultorios_medicina_general: number | null;
   consultorio: number | null;
@@ -78,7 +77,7 @@ async function fetchLiveAdvanceTables(): Promise<{
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
       .from('respuestas')
-      .select('fecha_registro,tipo_registro,entidad,usuario_nombre,usuario_email,clues_imb,nombre_de_la_unidad,internet,consultorios_habilitados,tiene_consultorios_inoperantes,consultorios_inhabilitados,total_consultorios_medicina_general,consultorio,pregunta,valor,turno')
+      .select('fecha_registro,tipo_registro,entidad,usuario_nombre,usuario_email,clues_imb,nombre_de_la_unidad,internet,consultorios_habilitados,consultorios_inhabilitados,total_consultorios_medicina_general,consultorio,pregunta,valor,turno')
       .range(from, from + pageSize - 1);
 
     if (error) throw new Error(`No fue posible consultar las respuestas de Supabase: ${error.message}`);
@@ -135,7 +134,6 @@ async function fetchLiveAdvanceTables(): Promise<{
       nombre_de_la_unidad: unit.name,
       internet: config?.internet,
       consultorios_habilitados: config?.consultorios_habilitados,
-      tiene_consultorios_inoperantes: config?.tiene_consultorios_inoperantes,
       consultorios_inhabilitados: config?.consultorios_inhabilitados,
       total_consultorios_medicina_general: config?.total_consultorios_medicina_general,
       consultorio: office,
@@ -179,7 +177,6 @@ async function fetchLiveAdvanceTables(): Promise<{
       nombre_de_la_unidad: unit?.name ?? String(config?.nombre_de_la_unidad ?? ''),
       internet: config?.internet,
       consultorios_habilitados: config?.consultorios_habilitados,
-      tiene_consultorios_inoperantes: config?.tiene_consultorios_inoperantes,
       consultorios_inhabilitados: config?.consultorios_inhabilitados,
       total_consultorios_medicina_general: config?.total_consultorios_medicina_general,
       consultorio: response.maxOffice,
@@ -189,7 +186,6 @@ async function fetchLiveAdvanceTables(): Promise<{
   const unitGeneralColumns = new Set([
     'internet',
     'consultorios_habilitados',
-    'tiene_consultorios_inoperantes',
     'consultorios_inhabilitados',
     'total_consultorios_medicina_general',
   ]);
@@ -213,15 +209,6 @@ async function fetchLiveAdvanceTables(): Promise<{
       if (typeof value === 'number') aggregate[column] = Number(aggregate[column] ?? 0) + value;
     }
 
-    const inoperantes = normalize(row.tiene_consultorios_inoperantes);
-    if (inoperantes === 'SI' || inoperantes === 'SÍ' || inoperantes === 'TRUE' || inoperantes === '1') {
-      aggregate.tiene_consultorios_inoperantes = 'SI';
-    } else if (
-      aggregate.tiene_consultorios_inoperantes !== 'SI'
-      && (inoperantes === 'NO' || inoperantes === 'FALSE' || inoperantes === '0')
-    ) {
-      aggregate.tiene_consultorios_inoperantes = 'NO';
-    }
     resumenEntidadMap.set(entidad, aggregate);
   }
   const resumenEntidad = [...resumenEntidadMap.values()];

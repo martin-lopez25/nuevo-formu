@@ -12,6 +12,8 @@ import {
   saveLocalAnswer,
   saveLocalGeneralData,
   getLocalGeneralData,
+  getLocalAnswersForUnit,
+  replaceLocalAnswersForUnit,
   addToSyncQueue,
   getPendingSyncQueue,
   removeSyncQueueItem,
@@ -288,15 +290,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (draft.selectedUnit) {
             setSelectedUnit(draft.selectedUnit);
             setIsUnitLocked(draft.isUnitLocked ?? true);
-            const gen = await getLocalGeneralData(draft.selectedUnit.clues);
-            const serverRes = await fetchUnitResponses(draft.selectedUnit.clues);
-
-            setAnswers(serverRes.answers || {});
-            if (gen || serverRes.general) {
+            try {
+              const serverRes = await fetchUnitResponses(draft.selectedUnit.clues);
+              const serverGeneral = {
+                ...defaultGeneralData,
+                clues: draft.selectedUnit.clues,
+                entidad: draft.selectedEntity || draft.selectedUnit.entity,
+                usuarioNombre: draft.user?.name || '',
+                ...(serverRes.general || {})
+              };
+              setAnswers(serverRes.answers || {});
+              setGeneralData(serverGeneral);
+              await Promise.all([
+                saveLocalGeneralData(serverGeneral),
+                replaceLocalAnswersForUnit(draft.selectedUnit.clues, serverRes.answers || {})
+              ]);
+            } catch (serverError) {
+              console.warn('Server unavailable while restoring draft:', serverError);
+              const [localGeneral, localAnswers] = await Promise.all([
+                getLocalGeneralData(draft.selectedUnit.clues),
+                getLocalAnswersForUnit(draft.selectedUnit.clues)
+              ]);
+              setAnswers(localAnswers);
               setGeneralData({
                 ...defaultGeneralData,
-                ...(gen || {}),
-                ...(serverRes.general || {})
+                clues: draft.selectedUnit.clues,
+                entidad: draft.selectedEntity || draft.selectedUnit.entity,
+                usuarioNombre: draft.user?.name || '',
+                ...(localGeneral || {})
               });
             }
           }
@@ -345,11 +366,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     addToast('Cargando información de la unidad...', 'info', unit.name);
 
-    // Local answers are only a synchronization safeguard; the form reflects the server.
-    const localGeneral = await getLocalGeneralData(unit.clues);
-    let serverAnswers: Record<string, QuestionAnswer> = {};
-
-    let mergedGeneral: UnitGeneralData = {
+    const baseGeneral: UnitGeneralData = {
       clues: unit.clues,
       entidad: selectedEntity || unit.entity,
       usuarioNombre: user?.name || '',
@@ -365,30 +382,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updatedAt: new Date().toISOString()
     };
 
-    if (localGeneral) {
-      mergedGeneral = { ...mergedGeneral, ...localGeneral };
-    }
-
-    // 2. Query server for previous answers and configurations
+    let loadedGeneral = baseGeneral;
+    let loadedAnswers: Record<string, QuestionAnswer> = {};
     try {
       const serverRes = await fetchUnitResponses(unit.clues);
-      serverAnswers = serverRes.answers || {};
+      loadedAnswers = serverRes.answers || {};
       if (serverRes.general) {
-        mergedGeneral = {
-          ...mergedGeneral,
+        loadedGeneral = {
+          ...baseGeneral,
           ...serverRes.general,
           entidad: selectedEntity || unit.entity,
-          usuarioNombre: user?.name || serverRes.general.usuarioNombre || '',
-          configuredOffices: serverRes.general.configuredOffices ?? mergedGeneral.configuredOffices
+          usuarioNombre: user?.name || serverRes.general.usuarioNombre || ''
         };
       }
-    } catch (err) {
-      console.warn('Server fetch unit responses error:', err);
+      await Promise.all([
+        saveLocalGeneralData(loadedGeneral),
+        replaceLocalAnswersForUnit(unit.clues, loadedAnswers)
+      ]);
+    } catch (serverError) {
+      console.warn('Server unavailable; loading local unit data:', serverError);
+      const [localGeneral, localAnswers] = await Promise.all([
+        getLocalGeneralData(unit.clues),
+        getLocalAnswersForUnit(unit.clues)
+      ]);
+      loadedGeneral = { ...baseGeneral, ...(localGeneral || {}) };
+      loadedAnswers = localAnswers;
+      addToast('Modo sin conexión', 'warning', 'Se muestran los datos guardados localmente.');
     }
 
-    setGeneralData(mergedGeneral);
-  setAnswers(serverAnswers);
-    await saveLocalGeneralData(mergedGeneral);
+    setGeneralData(loadedGeneral);
+    setAnswers(loadedAnswers);
 
     saveAppDraft('current_session', {
       selectedEntity,

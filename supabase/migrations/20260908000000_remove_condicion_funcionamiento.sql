@@ -20,7 +20,6 @@ alter table public.respuestas
       and pregunta is not null
       and internet is null
       and consultorios_habilitados is null
-      and tiene_consultorios_inoperantes is null
       and consultorios_inhabilitados is null
       and total_consultorios_medicina_general is null
       and ((pregunta = 'consultorios' and valor is null)

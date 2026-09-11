@@ -45,6 +45,20 @@ export function isOfficeScheduleQuestion(question: string) {
   return question.startsWith('¿Opera en este horario? ');
 }
 
+export function getDisabledCauseFromQuestion(question: string) {
+  return DISABLED_OFFICE_CAUSES.find((cause) => cause.question === question);
+}
+
+export function parseOfficeScheduleQuestion(question: string) {
+  const match = question.match(/^¿Opera en este horario\? (Matutino|Vespertino) - (.+)$/);
+  return match ? { turn: match[1] as OperationalTurn, day: match[2] } : null;
+}
+
+export function parseDoctorAvailabilityQuestion(question: string) {
+  const match = question.match(/^¿Cuenta con médico general\? (Matutino|Vespertino) - (.+)$/);
+  return match ? { turn: match[1] as OperationalTurn, day: match[2] } : null;
+}
+
 export function getRequiredOfficeConfigurationQuestions(turn: TurnType, isEnabled?: number | null) {
   if (isEnabled === 0) {
     return [OFFICE_ENABLED_QUESTION, DISABLED_CAUSE_CONFIRMATION_QUESTION];

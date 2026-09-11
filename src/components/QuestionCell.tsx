@@ -115,7 +115,7 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
   }
 
   // Tooltip content
-  const tooltipText = `Pregunta: ${question} | Consultorio: ${officeNumber} | Turno: ${turn || 'Matutino'}`;
+  const tooltipText = `Pregunta: ${question} | Consultorio: ${officeNumber} | Turno: ${turn || 'Sin seleccionar'}`;
 
   return (
     <td className="p-1 sm:p-2 text-center align-middle relative group">
@@ -189,7 +189,7 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
       {/* Accessible Tooltip on hover */}
       <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-30 px-2 py-1 rounded bg-black/95 text-[10px] text-zinc-200 border border-white/20 whitespace-nowrap pointer-events-none shadow-xl">
         <p className="font-semibold text-amber-300">{question}</p>
-        <p>Consultorio {officeNumber} • Turno: {turn || 'Matutino'}</p>
+        <p>Consultorio {officeNumber} • Turno: {turn || 'Sin seleccionar'}</p>
       </div>
     </td>
   );

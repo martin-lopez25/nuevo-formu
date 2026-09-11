@@ -223,9 +223,18 @@ export const OfficeConfigurationPanel: React.FC<OfficeConfigurationPanelProps> =
       </div>}
 
       {isEnabled && currentTurn && <div>
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <p className="text-[9px] font-bold text-emerald-100">Horario y médico general</p>
-          <p className="text-[8px] text-zinc-300">□ Horario · ○ Médico</p>
+        <div className="mb-2 space-y-1">
+          <p className="text-[11px] font-bold text-emerald-100">Horario y médico general</p>
+          <div className="flex flex-wrap gap-1.5 text-[10px] font-semibold text-zinc-100">
+            <span className="inline-flex items-center gap-1 rounded border border-amber-300/50 bg-amber-950/50 px-1.5 py-1">
+              <span className="h-3.5 w-3.5 rounded-sm border-2 border-amber-300" />
+              Día con horario
+            </span>
+            <span className="inline-flex items-center gap-1 rounded border border-emerald-300/50 bg-emerald-950/50 px-1.5 py-1">
+              <span className="h-3.5 w-3.5 rounded-full border-2 border-emerald-300" />
+              Médico disponible
+            </span>
+          </div>
         </div>
         <div className="overflow-hidden rounded-md border border-white/15">
           <div className="grid grid-cols-[55px_repeat(7,1fr)] bg-[#002F2A] text-center text-[8px] font-bold text-amber-200">

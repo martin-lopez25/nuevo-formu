@@ -147,7 +147,6 @@ function configToDatabase(config: StoredUnitConfig) {
     clues_imb: config.clues,
     internet: config.hasInternet,
     consultorios_habilitados: config.enabledOffices,
-    tiene_consultorios_inoperantes: config.hasTemporarilyClosedOffices,
     consultorios_inhabilitados: config.unoperatedOffices,
     total_consultorios_medicina_general: config.totalGeneralOffices,
     consultorio: null,
@@ -179,7 +178,9 @@ function configFromDatabase(row: any): StoredUnitConfig {
     entidad: row.entidad || '',
     usuarioNombre: row.usuario_nombre || '',
     hasInternet: row.internet || 'PENDIENTE',
-    hasTemporarilyClosedOffices: row.tiene_consultorios_inoperantes || 'PENDIENTE',
+    hasTemporarilyClosedOffices: row.consultorios_inhabilitados === null
+      ? 'PENDIENTE'
+      : Number(row.consultorios_inhabilitados) > 0 ? 'SI' : 'NO',
     enabledOffices: row.consultorios_habilitados === null ? null : Number(row.consultorios_habilitados),
     unoperatedOffices: row.consultorios_inhabilitados === null ? null : Number(row.consultorios_inhabilitados),
     totalGeneralOffices: row.total_consultorios_medicina_general === null
