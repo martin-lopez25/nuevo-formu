@@ -82,7 +82,7 @@ export const UnitSelector: React.FC<UnitSelectorProps> = ({ onUnlockRequest, onO
   };
 
   return (
-    <div className="w-full rounded-3xl backdrop-blur-md bg-[#002F2A]/75 border border-white/25 p-4 sm:p-5 shadow-[0_25px_60px_rgba(0,0,0,0.5)] text-white">
+    <div id="unit-selector" className="w-full scroll-mt-4 rounded-3xl backdrop-blur-md bg-[#002F2A]/75 border border-white/25 p-4 sm:p-5 shadow-[0_25px_60px_rgba(0,0,0,0.5)] text-white">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/20 pb-3 mb-3">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-transparent border border-[#A57F2C]/60 flex items-center justify-center text-[#A57F2C] backdrop-blur-sm shadow-sm">

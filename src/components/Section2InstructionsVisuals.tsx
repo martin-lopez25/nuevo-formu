@@ -101,7 +101,7 @@ export const Section2InstructionsVisuals: React.FC = () => {
                 7. Guardado Automático
               </h4>
               <p className="text-xs text-black leading-relaxed">
-                El turno se guarda al seleccionar el horario correspondiente. Cada cantidad se guarda al presionar Enter o el botón Guardar. Si no hay conexión, los cambios quedan almacenados en este dispositivo para sincronizarse después.
+                El turno se guarda al seleccionar el horario correspondiente. Las cantidades de equipos y consultorios requieren dos pasos: Guardar o Aplicar y después Confirmar; también puede presionar Enter dos veces. Si no hay conexión, los cambios quedan almacenados en este dispositivo para sincronizarse después.
               </p>
             </div>
             <div className="p-4 rounded-2xl bg-white/35 border border-black/15 backdrop-blur-sm shadow-sm">

@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext.tsx';
-import { Wifi, Users, AlertCircle, CheckCircle2, Sliders, ChevronDown, ListFilter } from 'lucide-react';
+import { Wifi, AlertCircle, CheckCircle2, Sliders, ChevronDown, ListFilter } from 'lucide-react';
 import { EQUIPMENT_CATALOG } from '../data/equipmentCatalog.ts';
-import { NumericStepper } from './NumericStepper.tsx';
 
 interface GeneralQuestionsProps {
   onScrollToQuestion?: (questionName: string) => void;
@@ -13,21 +12,17 @@ export const GeneralQuestions: React.FC<GeneralQuestionsProps> = ({ onScrollToQu
     selectedUnit,
     generalData,
     handleSetInternet,
-    handleSetGeneralOfficeAvailability,
     handleConfigureOffices,
     stats,
     answers
   } = useApp();
 
   const [officeCountInput, setOfficeCountInput] = useState(generalData.configuredOffices === null ? '' : String(generalData.configuredOffices));
-  const [enabledInput, setEnabledInput] = useState(generalData.enabledOffices === null ? '' : String(generalData.enabledOffices));
-  const [unoperatedInput, setUnoperatedInput] = useState(generalData.unoperatedOffices === null ? '' : String(generalData.unoperatedOffices));
+  const [isOfficeCountConfirmationPending, setIsOfficeCountConfirmationPending] = useState(false);
 
   useEffect(() => {
     setOfficeCountInput(generalData.configuredOffices === null ? '' : String(generalData.configuredOffices));
-    setEnabledInput(generalData.enabledOffices === null ? '' : String(generalData.enabledOffices));
-    setUnoperatedInput(generalData.unoperatedOffices === null ? '' : String(generalData.unoperatedOffices));
-  }, [generalData.configuredOffices, generalData.enabledOffices, generalData.unoperatedOffices]);
+  }, [generalData.configuredOffices]);
 
   if (!selectedUnit) return null;
 
@@ -42,31 +37,16 @@ export const GeneralQuestions: React.FC<GeneralQuestionsProps> = ({ onScrollToQu
     });
   }
 
-  const handleApplyOfficeCount = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleApplyOfficeCount = (event?: React.FormEvent) => {
+    event?.preventDefault();
     if (officeCountInput === '') return;
+    if (!isOfficeCountConfirmationPending) {
+      setIsOfficeCountConfirmationPending(true);
+      return;
+    }
+    setIsOfficeCountConfirmationPending(false);
     handleConfigureOffices(Number(officeCountInput));
   };
-
-  const saveOfficeAvailability = (enabled = enabledInput, unoperated = unoperatedInput) => {
-    if (generalData.hasTemporarilyClosedOffices === 'PENDIENTE') return;
-    handleSetGeneralOfficeAvailability(
-      generalData.hasTemporarilyClosedOffices,
-      enabled === '' ? null : Number(enabled),
-      unoperated === '' ? null : Number(unoperated)
-    );
-  };
-
-  const selectOfficeAvailability = (option: 'SI' | 'NO') => {
-    setEnabledInput('');
-    setUnoperatedInput('');
-    handleSetGeneralOfficeAvailability(option, null, option === 'NO' ? 0 : null);
-  };
-
-  const totalInput = enabledInput !== ''
-    && (generalData.hasTemporarilyClosedOffices === 'NO' || unoperatedInput !== '')
-      ? Number(enabledInput) + (generalData.hasTemporarilyClosedOffices === 'SI' ? Number(unoperatedInput) : 0)
-      : '';
 
   return (
     <div className="w-full space-y-4">
@@ -79,7 +59,7 @@ export const GeneralQuestions: React.FC<GeneralQuestionsProps> = ({ onScrollToQu
           </h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {/* Question 1: Internet Service */}
           <div className="p-3 rounded-xl bg-black/30 border border-white/10 flex flex-col justify-between space-y-2">
             <label className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
@@ -108,71 +88,6 @@ export const GeneralQuestions: React.FC<GeneralQuestionsProps> = ({ onScrollToQu
             </div>
           </div>
 
-          {/* Question 2: Consultorios de Medicina General */}
-          <div className="p-3 rounded-xl bg-black/30 border border-white/10 flex flex-col justify-between space-y-2">
-            <div className="text-xs font-semibold text-zinc-200 flex items-start gap-1.5">
-              <Users className="w-3.5 h-3.5 text-[#A57F2C]" />
-              <span>¿Tiene consultorios que no operan temporalmente por falta de personal u otra causa?</span>
-            </div>
-            <div className="grid grid-cols-2 gap-1.5">
-              {(['SI', 'NO'] as const).map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => selectOfficeAvailability(option)}
-                  className={`py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    generalData.hasTemporarilyClosedOffices === option
-                      ? option === 'SI'
-                        ? 'bg-emerald-600 text-white shadow-md'
-                        : 'bg-rose-700 text-white shadow-md'
-                      : 'bg-white/10 hover:bg-white/20 text-zinc-300'
-                  }`}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-            {generalData.hasTemporarilyClosedOffices !== 'PENDIENTE' && (
-              <div className={`grid gap-2 ${generalData.hasTemporarilyClosedOffices === 'SI' ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                <label className="text-[11px] text-zinc-300">
-                  Habilitados
-                  <NumericStepper
-                    id="enabled-offices-input"
-                    min="0"
-                    max="50"
-                    value={enabledInput}
-                    onChange={setEnabledInput}
-                    onCommit={(value) => saveOfficeAvailability(value, unoperatedInput)}
-                    onBlur={() => saveOfficeAvailability()}
-                    onEnter={() => saveOfficeAvailability()}
-                    inputClassName="px-1 py-1.5 text-sm font-bold text-white"
-                  />
-                </label>
-                {generalData.hasTemporarilyClosedOffices === 'SI' && (
-                  <label className="text-[11px] text-zinc-300">
-                    Inhabilitados
-                    <NumericStepper
-                      min="0"
-                      max="50"
-                      value={unoperatedInput}
-                      onChange={setUnoperatedInput}
-                      onCommit={(value) => saveOfficeAvailability(enabledInput, value)}
-                      onBlur={() => saveOfficeAvailability()}
-                      onEnter={() => saveOfficeAvailability()}
-                      inputClassName="px-1 py-1.5 text-sm font-bold text-white"
-                    />
-                  </label>
-                )}
-                <div className="text-[11px] text-zinc-300">
-                  Total
-                  <div className="mt-1 px-2 py-1.5 rounded-lg bg-white/10 border border-white/15 text-amber-300 font-bold text-center text-sm">
-                    {totalInput}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
         </div>
 
         {/* Office Configurator Form */}
@@ -181,13 +96,27 @@ export const GeneralQuestions: React.FC<GeneralQuestionsProps> = ({ onScrollToQu
             <label htmlFor="office-count-to-capture" className="text-xs font-semibold text-emerald-200">
               Número de consultorios que se capturarán para el informe SUS:
             </label>
-            <NumericStepper
+            <input
               id="office-count-to-capture"
-              min="0"
-              max="20"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={officeCountInput}
-              onChange={setOfficeCountInput}
-              inputClassName="w-10 px-1 py-1.5 text-sm font-bold text-white"
+              onChange={(event) => {
+                const value = event.target.value;
+                if (value === '' || (/^\d+$/.test(value) && Number(value) <= 20)) {
+                  setOfficeCountInput(value);
+                  setIsOfficeCountConfirmationPending(false);
+                }
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  handleApplyOfficeCount();
+                }
+              }}
+              aria-label="Número de consultorios para el informe SUS"
+              className="w-16 rounded-lg border border-white/20 bg-black/40 px-2 py-1.5 text-center text-sm font-bold text-white focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
             <button
               type="submit"
@@ -195,9 +124,13 @@ export const GeneralQuestions: React.FC<GeneralQuestionsProps> = ({ onScrollToQu
               className="px-4 py-1.5 rounded-lg bg-[#A57F2C] hover:bg-[#b88f33] text-black font-bold text-xs shadow-md transition-all uppercase disabled:cursor-not-allowed disabled:opacity-40"
               id="btn-aplicar-consultorios"
             >
-              APLICAR
+              {isOfficeCountConfirmationPending ? 'CONFIRMAR' : 'APLICAR'}
             </button>
           </div>
+
+          <p className="basis-full text-[11px] text-amber-200">
+            Para evitar capturas accidentales, las cantidades de consultorios requieren presionar Guardar o Aplicar y después Confirmar. También puede presionar Enter dos veces.
+          </p>
 
           <div className="flex items-center gap-3 text-xs text-zinc-300 font-mono">
             <span>Consultorios configurados: <strong className="text-amber-300">{generalData.configuredOffices ?? ''}</strong></span>

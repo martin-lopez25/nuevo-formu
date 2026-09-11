@@ -28,6 +28,7 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
       : ''
   );
   const [errorMsg, setErrorMsg] = useState<string>('');
+  const [isSaveConfirmationPending, setIsSaveConfirmationPending] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -38,6 +39,7 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
           : ''
       );
       setErrorMsg('');
+      setIsSaveConfirmationPending(false);
       setTimeout(() => {
         inputRef.current?.focus();
         inputRef.current?.select();
@@ -52,6 +54,7 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
   const handleCancelEdit = () => {
     setEditingCell(null);
     setErrorMsg('');
+    setIsSaveConfirmationPending(false);
   };
 
   const handleSave = async () => {
@@ -65,9 +68,18 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
     const num = Number(trimmed);
     if (isNaN(num) || !Number.isInteger(num) || num < 0) {
       setErrorMsg('Solo enteros ≥ 0');
+      setIsSaveConfirmationPending(false);
       return;
     }
 
+    if (!isSaveConfirmationPending) {
+      setIsSaveConfirmationPending(true);
+      setErrorMsg('Presione Confirmar para guardar');
+      return;
+    }
+
+    setIsSaveConfirmationPending(false);
+    setErrorMsg('');
     await handleSaveAnswer(officeNumber, question, num);
   };
 
@@ -115,6 +127,7 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
               onChange={(value) => {
                 setInputValue(value);
                 setErrorMsg('');
+                setIsSaveConfirmationPending(false);
               }}
               onEnter={handleSave}
               onEscape={handleCancelEdit}
@@ -123,11 +136,15 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
             <button
               type="button"
               onClick={handleSave}
-              className="px-2 py-1 bg-[#A57F2C] hover:bg-[#b88f33] text-black font-extrabold text-[10px] rounded transition-colors flex items-center gap-0.5"
-              title="Guardar (Enter)"
+              className={`px-2 py-1 text-black font-extrabold text-[10px] rounded transition-colors flex items-center gap-0.5 ${
+                isSaveConfirmationPending
+                  ? 'bg-emerald-500 hover:bg-emerald-400'
+                  : 'bg-[#A57F2C] hover:bg-[#b88f33]'
+              }`}
+              title={isSaveConfirmationPending ? 'Confirmar guardado (segundo clic)' : 'Guardar (primer clic)'}
             >
-              <Save className="w-3 h-3" />
-              <span className="hidden sm:inline">GUARDAR</span>
+              {isSaveConfirmationPending ? <Check className="w-3 h-3" /> : <Save className="w-3 h-3" />}
+              <span className="hidden sm:inline">{isSaveConfirmationPending ? 'CONFIRMAR' : 'GUARDAR'}</span>
             </button>
             <button
               type="button"
@@ -140,7 +157,11 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
           </div>
           <p className="mt-0.5 text-[9px] leading-tight text-zinc-300">Capture únicamente bienes en condiciones óptimas de funcionamiento.</p>
           {errorMsg && (
-            <div className="absolute -bottom-6 left-0 right-0 text-[10px] text-rose-300 bg-rose-950 px-1 py-0.5 rounded border border-rose-600 z-30">
+            <div className={`absolute -bottom-6 left-0 right-0 text-[10px] px-1 py-0.5 rounded border z-30 ${
+              isSaveConfirmationPending
+                ? 'text-amber-200 bg-amber-950 border-amber-500'
+                : 'text-rose-300 bg-rose-950 border-rose-600'
+            }`}>
               {errorMsg}
             </div>
           )}

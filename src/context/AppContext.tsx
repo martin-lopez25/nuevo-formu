@@ -62,6 +62,8 @@ interface AppContextType {
   setIsDetailsModalOpen: (open: boolean) => void;
   isZeroOfficesModalOpen: boolean;
   setIsZeroOfficesModalOpen: (open: boolean) => void;
+  completedUnitName: string | null;
+  setCompletedUnitName: (name: string | null) => void;
   conflictData: ConflictData | null;
   setConflictData: (conflict: ConflictData | null) => void;
 
@@ -127,6 +129,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState<boolean>(false);
   const [isZeroOfficesModalOpen, setIsZeroOfficesModalOpen] = useState<boolean>(false);
+  const [completedUnitName, setCompletedUnitName] = useState<string | null>(null);
   const [conflictData, setConflictData] = useState<ConflictData | null>(null);
 
   const addToast = useCallback((title: string, type: ToastMessage['type'] = 'info', description?: string) => {
@@ -379,6 +382,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('Cambio de unidad habilitado', 'info', 'Selecciona otra unidad médica.');
   }, [selectedEntity, user, addToast]);
 
+  const finishCompletedUnit = useCallback((unitName: string) => {
+    setCompletedUnitName(unitName);
+    setIsUnitLocked(false);
+    setSelectedUnit(null);
+    setAnswers({});
+    setGeneralData(defaultGeneralData);
+    saveAppDraft('current_session', {
+      selectedEntity,
+      user,
+      selectedUnit: null,
+      isUnitLocked: false
+    });
+    addToast('Unidad completada', 'success', `${unitName}. Seleccione la siguiente unidad médica.`);
+    setTimeout(() => {
+      document.getElementById('unit-selector')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  }, [selectedEntity, user, addToast]);
+
   // Office configuration
   const handleConfigureOffices = useCallback((count: number) => {
     const safeCount = Math.max(0, Math.min(20, Math.floor(count)));
@@ -405,20 +426,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       saveLocalGeneralData(updated);
       if (selectedUnit) {
         saveUnitGeneral(selectedUnit.clues, updated)
-          .then(() => addToast(`Consultorios para captura guardados: ${safeCount}`, 'success'))
-          .catch(() => {
-            addToSyncQueue({
+          .then(() => {
+            addToast(`Consultorios para captura guardados: ${safeCount}`, 'success');
+            if (safeCount === 0) finishCompletedUnit(selectedUnit.name);
+          })
+          .catch(async () => {
+            await addToSyncQueue({
               action: 'save_general',
               clues: selectedUnit.clues,
               payload: updated
             });
-            refreshPendingCount();
+            await refreshPendingCount();
             addToast('Consultorios guardados localmente', 'warning', 'Se sincronizarán al reconectar.');
+            if (safeCount === 0) finishCompletedUnit(selectedUnit.name);
           });
       }
       return updated;
     });
-  }, [selectedUnit, selectedEntity, user, answers, addToast, refreshPendingCount]);
+  }, [selectedUnit, selectedEntity, user, answers, addToast, refreshPendingCount, finishCompletedUnit]);
 
   const handleConfirmZeroOffices = useCallback(async () => {
     if (!selectedUnit) return;
@@ -439,11 +464,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setAnswers({});
       setIsZeroOfficesModalOpen(false);
       await refreshPendingCount();
-      addToast('Respuestas eliminadas', 'success', 'La unidad quedó configurada con 0 consultorios.');
+      finishCompletedUnit(selectedUnit.name);
     } catch (error) {
       addToast('No se eliminaron las respuestas', 'error', 'La base de datos no confirmó la operación. Intenta nuevamente.');
     }
-  }, [selectedUnit, selectedEntity, user, generalData, addToast, refreshPendingCount]);
+  }, [selectedUnit, selectedEntity, user, generalData, addToast, refreshPendingCount, finishCompletedUnit]);
 
   // General fields update
   const handleSetInternet = useCallback(async (status: 'SI' | 'NO' | 'PENDIENTE') => {
@@ -545,6 +570,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const cellKey = `${officeNumber}__${question}`;
     const previous = answers[cellKey];
+    const configuredOffices = generalData.configuredOffices ?? 0;
+    const answerExists = (key: string) => {
+      const answer = answers[key];
+      return answer?.value !== null && answer?.value !== undefined;
+    };
+    const wasComplete = configuredOffices > 0 && Array.from(
+      { length: configuredOffices },
+      (_, index) => index + 1
+    ).every((office) => EQUIPMENT_CATALOG.every((item) => answerExists(`${office}__${item.name}`)));
+    const completesUnit = !wasComplete && configuredOffices > 0 && Array.from(
+      { length: configuredOffices },
+      (_, index) => index + 1
+    ).every((office) => EQUIPMENT_CATALOG.every((item) => {
+      const key = `${office}__${item.name}`;
+      return key === cellKey || answerExists(key);
+    }));
 
     // Optimistic local update
     const newAnswer: QuestionAnswer = {
@@ -611,7 +652,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         'Estamos teniendo fallas de conexión con el servidor. Si nota que alguna pregunta no se llena, vuelva a intentar.'
       );
     }
-  }, [selectedUnit, user, selectedEntity, answers, generalData, addToast, refreshPendingCount]);
+
+    if (completesUnit) {
+      finishCompletedUnit(selectedUnit.name);
+    }
+  }, [selectedUnit, user, selectedEntity, answers, generalData, addToast, refreshPendingCount, finishCompletedUnit]);
 
   const setEditingCell = useCallback((key: string | null) => {
     setEditingCellKey(key);
@@ -669,9 +714,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }
 
-  const progressPercentage = totalQuestions > 0 ? Number(((answeredCount / totalQuestions) * 100).toFixed(1)) : 0;
+  const progressPercentage = generalData.configuredOffices === 0
+    ? 100
+    : totalQuestions > 0
+      ? Number(((answeredCount / totalQuestions) * 100).toFixed(1))
+      : 0;
   const pendingCount = totalQuestions - answeredCount;
-  const isFullySaved = totalQuestions > 0 && answeredCount === totalQuestions;
+  const isFullySaved = generalData.configuredOffices === 0
+    || (totalQuestions > 0 && answeredCount === totalQuestions);
 
   return (
     <AppContext.Provider
@@ -697,6 +747,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsDetailsModalOpen,
         isZeroOfficesModalOpen,
         setIsZeroOfficesModalOpen,
+        completedUnitName,
+        setCompletedUnitName,
         conflictData,
         setConflictData,
         handleSelectEntity,

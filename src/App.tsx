@@ -14,6 +14,7 @@ import { QuestionnaireTable } from './components/QuestionnaireTable.tsx';
 import { UnitDetailsModal } from './components/UnitDetailsModal.tsx';
 import { ZeroOfficesModal } from './components/ZeroOfficesModal.tsx';
 import { ConflictModal } from './components/ConflictModal.tsx';
+import { CompletedUnitModal } from './components/CompletedUnitModal.tsx';
 import { SecretAdminModal } from './components/SecretAdminModal.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -233,6 +234,7 @@ const MainAppContent: React.FC = () => {
       <UnitDetailsModal />
       <ZeroOfficesModal />
       <ConflictModal />
+      <CompletedUnitModal />
       <SecretAdminModal
         isOpen={isAdminModalOpen}
         onClose={() => setIsAdminModalOpen(false)}
