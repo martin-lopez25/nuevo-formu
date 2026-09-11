@@ -81,7 +81,7 @@
   },
   {
     "id": 15,
-    "name": "Cubeta de acero inoxidable / Porta cubeta rodable con protector de hule"
+    "name": "Cubeta de acero inoxidable con porta cubeta rodable con protector de hule"
   },
   {
     "id": 16,
@@ -205,11 +205,15 @@
   },
   {
     "id": 64,
-    "name": "Refrigerador para conservación y manejo de biológicos"
+    "name": "Refrigerador para vacunas"
+  },
+  {
+    "id": 33,
+    "name": "Refrigerador para farmacia"
   },
   {
     "id": 65,
-    "name": "Congelador para conservación y manejo de biológicos"
+    "name": "Congelador para paquetes fríos"
   },
   {
     "id": 53,

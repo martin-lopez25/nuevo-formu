@@ -231,6 +231,13 @@ export async function searchUnits(query: string, entityName?: string): Promise<M
 }
 
 export async function fetchUnitResponses(clues: string): Promise<{ answers: Record<string, QuestionAnswer>; general?: UnitGeneralData }> {
+  const questionAliases: Record<string, string> = {
+    'Cubeta de acero inoxidable / Porta cubeta rodable con protector de hule': 'Cubeta de acero inoxidable con porta cubeta rodable con protector de hule',
+    'Refrigerador para conservación y manejo de biológicos': 'Refrigerador para vacunas',
+    'Congelador para conservación y manejo de biológicos': 'Congelador para paquetes fríos'
+  };
+  const normalizeQuestionName = (question: string) => questionAliases[question] || question;
+
   if (supabase) {
     const normalizedClues = clues.trim().toUpperCase();
     const { data, error } = await supabase
@@ -249,11 +256,12 @@ export async function fetchUnitResponses(clues: string): Promise<{ answers: Reco
       .filter((row) => row.tipo_registro === 'respuesta' && row.pregunta !== 'consultorios' && row.valor !== null)
       .forEach((row) => {
         const officeNumber = Number(row.consultorio);
+        const question = normalizeQuestionName(String(row.pregunta));
         if (row.turno) turns[officeNumber] = row.turno;
-        answers[`${officeNumber}__${row.pregunta}`] = {
+        answers[`${officeNumber}__${question}`] = {
           clues: normalizedClues,
           officeNumber,
-          question: row.pregunta,
+          question,
           value: row.valor === null ? null : Number(row.valor),
           status: 'saved_cloud',
           turn: row.turno || '',
@@ -288,8 +296,9 @@ export async function fetchUnitResponses(clues: string): Promise<{ answers: Reco
     const answers: Record<string, QuestionAnswer> = {};
     if (json.data?.matriz && Object.keys(json.data.matriz).length > 0) {
       Object.entries(json.data.matriz).forEach(([officeNumber, questions]) => {
-        Object.entries(questions as Record<string, any>).forEach(([question, cell]) => {
+        Object.entries(questions as Record<string, any>).forEach(([storedQuestion, cell]) => {
           const numericOffice = Number(officeNumber);
+          const question = normalizeQuestionName(storedQuestion);
           answers[`${numericOffice}__${question}`] = {
             clues,
             officeNumber: numericOffice,
@@ -303,11 +312,12 @@ export async function fetchUnitResponses(clues: string): Promise<{ answers: Reco
       });
     } else if (json.data && Array.isArray(json.data.respuestas)) {
       json.data.respuestas.forEach((r: any) => {
-        const k = `${r.numeroConsultorio || r.officeNumber}__${r.pregunta || r.question}`;
+        const question = normalizeQuestionName(r.pregunta || r.question);
+        const k = `${r.numeroConsultorio || r.officeNumber}__${question}`;
         answers[k] = {
           clues: r.clues,
           officeNumber: r.numeroConsultorio || r.officeNumber,
-          question: r.pregunta || r.question,
+          question,
           value: r.valor !== undefined ? r.valor : r.value,
           status: 'saved_cloud',
           turn: r.turno || r.turn,

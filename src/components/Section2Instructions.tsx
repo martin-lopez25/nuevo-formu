@@ -112,7 +112,9 @@ export const Section2Instructions: React.FC = () => {
               </h3>
               <p className="text-xs text-black leading-relaxed">
                 Para cada consultorio complete:
-                <br />• <strong>Turno:</strong> Seleccione el horario correspondiente, incluyendo las modalidades matutinas por días de operación.
+                <br />• <strong>Habilitación:</strong> Indique si el consultorio está habilitado. Si selecciona NO, toda la captura de ese consultorio quedará bloqueada y no será necesario responder sus demás campos.
+                <br />• <strong>Turno:</strong> Seleccione Matutino, Vespertino o Ambos.
+                <br />• <strong>Médicos generales:</strong> Capture la cantidad total una sola vez. En la matriz semanal, el círculo vacío significa NO y el círculo marcado significa SÍ. Si selecciona Ambos, complete una fila por cada turno.
                 <br />• <strong>Cantidad:</strong> Haga clic en la celda, capture un número entero igual o mayor que 0, presione Guardar y después Confirmar. También puede presionar Enter dos veces. Cuente únicamente bienes en condiciones óptimas de funcionamiento.
               </p>
             </div>

@@ -2,19 +2,16 @@ import React from 'react';
 import { useApp } from '../context/AppContext.tsx';
 import { EQUIPMENT_CATALOG } from '../data/equipmentCatalog.ts';
 import { QuestionCell } from './QuestionCell.tsx';
-import { TurnType } from '../types.ts';
-import { Sunrise, CheckCircle2 } from 'lucide-react';
+import { OfficeConfigurationPanel } from './OfficeConfigurationPanel.tsx';
+import { CheckCircle2, ClipboardList } from 'lucide-react';
+import { OFFICE_ENABLED_QUESTION } from '../data/officeConfiguration.ts';
 
 interface QuestionnaireTableProps {
   tableContainerRef?: React.RefObject<HTMLDivElement>;
 }
 
 export const QuestionnaireTable: React.FC<QuestionnaireTableProps> = ({ tableContainerRef }) => {
-  const {
-    generalData,
-    answers,
-    handleSetTurn
-  } = useApp();
+  const { generalData, answers } = useApp();
 
   const officesCount = generalData.configuredOffices ?? 0;
   const officesList = Array.from({ length: officesCount }, (_, i) => i + 1);
@@ -31,16 +28,6 @@ export const QuestionnaireTable: React.FC<QuestionnaireTableProps> = ({ tableCon
       </div>
     );
   }
-
-  // Turn options
-  const turnOptions: TurnType[] = [
-    'Matutino',
-    'Matutino lunes a viernes',
-    'Matutino miércoles a domingo',
-    'Matutino sábados y domingos (fin de semana)',
-    'Vespertino',
-    'Ambos'
-  ];
 
   return (
     <div className="w-full rounded-3xl backdrop-blur-md bg-transparent border border-white/25 shadow-[0_25px_60px_rgba(0,0,0,0.5)] overflow-hidden text-white">
@@ -78,38 +65,26 @@ export const QuestionnaireTable: React.FC<QuestionnaireTableProps> = ({ tableCon
               {officesList.map((cNum) => (
                 <th
                   key={`th-${cNum}`}
-                  className="p-3 text-center font-bold text-white text-xs min-w-[120px] sm:min-w-[150px] border-r border-white/15 last:border-r-0"
+                  className="p-2 text-center font-bold text-white text-xs min-w-[350px] border-r border-white/15 last:border-r-0"
                 >
                   Consultorio {cNum}
                 </th>
               ))}
             </tr>
 
-            {/* Row 1: TURNO row */}
+            {/* Office configuration row */}
             <tr className="bg-[#1E5B4F]/50 border-b border-white/15">
               <td className="sticky left-0 z-30 bg-[#1E5B4F]/90 backdrop-blur-md p-2.5 font-bold text-amber-300 text-xs border-r border-white/15">
                 <div className="flex items-center gap-1.5">
-                  <Sunrise className="w-3.5 h-3.5 text-[#A57F2C]" />
-                  <span>Turno</span>
+                  <ClipboardList className="w-3.5 h-3.5 text-[#A57F2C]" />
+                  <span>Configuración del consultorio</span>
                 </div>
               </td>
-              {officesList.map((cNum) => {
-                const currentTurn = generalData.turns[cNum] || 'Matutino';
-                return (
-                  <td key={`turn-${cNum}`} className="p-2 text-center border-r border-white/15 last:border-r-0">
-                    <select
-                      value={currentTurn}
-                      onChange={(event) => handleSetTurn(cNum, event.target.value as TurnType)}
-                      aria-label={`Turno del consultorio ${cNum}`}
-                      className="w-full min-w-[190px] rounded-lg border border-white/20 bg-[#1E5B4F] px-2 py-1.5 text-[11px] font-semibold text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-                    >
-                      {turnOptions.map((turn) => (
-                        <option key={turn} value={turn}>{turn}</option>
-                      ))}
-                    </select>
+              {officesList.map((cNum) => (
+                  <td key={`config-${cNum}`} className="p-1.5 align-top border-r border-white/15 last:border-r-0">
+                    <OfficeConfigurationPanel officeNumber={cNum} />
                   </td>
-                );
-              })}
+              ))}
             </tr>
           </thead>
 
@@ -119,6 +94,8 @@ export const QuestionnaireTable: React.FC<QuestionnaireTableProps> = ({ tableCon
               // Check if all offices in this row have saved answers
               let allAnsweredInRow = true;
               for (const cNum of officesList) {
+                const isOfficeDisabled = answers[`${cNum}__${OFFICE_ENABLED_QUESTION}`]?.value === 0;
+                if (isOfficeDisabled) continue;
                 const ans = answers[`${cNum}__${item.name}`];
                 if (!ans || ans.value === null || ans.value === undefined) {
                   allAnsweredInRow = false;
@@ -160,7 +137,8 @@ export const QuestionnaireTable: React.FC<QuestionnaireTableProps> = ({ tableCon
                       key={`cell-${cNum}-${item.id}`}
                       officeNumber={cNum}
                       question={item.name}
-                      turn={generalData.turns[cNum] || 'Matutino'}
+                      turn={generalData.turns[cNum] || ''}
+                      disabled={answers[`${cNum}__${OFFICE_ENABLED_QUESTION}`]?.value !== 1}
                     />
                   ))}
                 </tr>

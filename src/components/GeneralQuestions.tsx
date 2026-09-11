@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext.tsx';
 import { Wifi, AlertCircle, CheckCircle2, Sliders, ChevronDown, ListFilter } from 'lucide-react';
 import { EQUIPMENT_CATALOG } from '../data/equipmentCatalog.ts';
+import { OFFICE_ENABLED_QUESTION } from '../data/officeConfiguration.ts';
 
 interface GeneralQuestionsProps {
   onScrollToQuestion?: (questionName: string) => void;
@@ -29,6 +30,7 @@ export const GeneralQuestions: React.FC<GeneralQuestionsProps> = ({ onScrollToQu
   // Find all missing questions across all configured offices
   const missingQuestionsList: { office: number; question: string }[] = [];
   for (let c = 1; c <= (generalData.configuredOffices ?? 0); c++) {
+    if (answers[`${c}__${OFFICE_ENABLED_QUESTION}`]?.value !== 1) continue;
     EQUIPMENT_CATALOG.forEach((q) => {
       const ans = answers[`${c}__${q.name}`];
       if (!ans || ans.value === null || ans.value === undefined) {
@@ -55,7 +57,7 @@ export const GeneralQuestions: React.FC<GeneralQuestionsProps> = ({ onScrollToQu
         <div className="flex items-center gap-2 border-b border-white/20 pb-2.5">
           <Sliders className="w-4 h-4 text-[#A57F2C]" />
           <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-white drop-shadow-sm">
-            Preguntas Generales y Configuración de Consultorios
+            Características y Configuración de Consultorios de Medicina General
           </h3>
         </div>
 
@@ -94,7 +96,7 @@ export const GeneralQuestions: React.FC<GeneralQuestionsProps> = ({ onScrollToQu
         <form onSubmit={handleApplyOfficeCount} className="pt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <label htmlFor="office-count-to-capture" className="text-xs font-semibold text-emerald-200">
-              Número de consultorios que se capturarán para el informe SUS:
+              Número total de consultorios de Medicina General con que cuenta la Unidad Médica, incluyendo aquellos habilitados e inhabilitados:
             </label>
             <input
               id="office-count-to-capture"

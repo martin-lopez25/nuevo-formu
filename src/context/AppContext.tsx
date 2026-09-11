@@ -29,6 +29,12 @@ import {
   deleteUnitAnswers
 } from '../services/api.ts';
 import { EQUIPMENT_CATALOG } from '../data/equipmentCatalog.ts';
+import {
+  getRequiredOfficeConfigurationQuestions,
+  isDoctorAvailabilityQuestion,
+  OFFICE_ENABLED_QUESTION,
+  TURN_SELECTION_QUESTION
+} from '../data/officeConfiguration.ts';
 
 export type AppSection = 'inicio' | 'instrucciones' | 'instrucciones_2' | 'formulario';
 
@@ -81,7 +87,7 @@ interface AppContextType {
     unoperatedOffices: number | null
   ) => Promise<void>;
   handleSetTurn: (officeNumber: number, turn: TurnType) => Promise<void>;
-  handleSaveAnswer: (officeNumber: number, question: string, value: number) => Promise<void>;
+  handleSaveAnswer: (officeNumber: number, question: string, value: number, silentSuccess?: boolean) => Promise<void>;
   setEditingCell: (key: string | null) => void;
   addToast: (title: string, type?: ToastMessage['type'], description?: string) => void;
   removeToast: (id: string) => void;
@@ -108,9 +114,31 @@ const defaultGeneralData: UnitGeneralData = {
   unoperatedOffices: null,
   totalGeneralOffices: null,
   configuredOffices: null,
-  turns: { 1: 'Matutino' },
+  turns: {},
   updatedAt: new Date().toISOString()
 };
+
+function isQuestionnaireComplete(
+  data: UnitGeneralData,
+  currentAnswers: Record<string, QuestionAnswer>
+) {
+  const officeCount = data.configuredOffices ?? 0;
+  if (officeCount <= 0) return false;
+
+  return Array.from({ length: officeCount }, (_, index) => index + 1).every((officeNumber) => {
+    const enabledAnswer = currentAnswers[`${officeNumber}__${OFFICE_ENABLED_QUESTION}`];
+    const requiredQuestions = [
+      ...getRequiredOfficeConfigurationQuestions(data.turns[officeNumber] || '', enabledAnswer?.value),
+      ...(enabledAnswer?.value === 1 ? EQUIPMENT_CATALOG.map((item) => item.name) : [])
+    ];
+    return requiredQuestions.every((question) => {
+      if (question === TURN_SELECTION_QUESTION) return Boolean(data.turns[officeNumber]);
+      if (isDoctorAvailabilityQuestion(question)) return true;
+      const answer = currentAnswers[`${officeNumber}__${question}`];
+      return answer?.value !== null && answer?.value !== undefined;
+    });
+  });
+}
 
 const AppContext = createContext<AppContextType | null>(null);
 
@@ -328,7 +356,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ? null
         : unit.enabledOffices + (unit.unoperatedOffices ?? 0),
       configuredOffices: unit.totalOffices ?? null,
-      turns: { 1: 'Matutino' },
+      turns: {},
       updatedAt: new Date().toISOString()
     };
 
@@ -413,7 +441,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         Object.keys(newTurns).forEach((key) => delete newTurns[Number(key)]);
       }
       for (let i = 1; i <= safeCount; i++) {
-        if (!newTurns[i]) newTurns[i] = 'Matutino';
+        if (newTurns[i] === undefined) newTurns[i] = '';
       }
       const updated: UnitGeneralData = {
         ...prev,
@@ -530,6 +558,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Turn selection for an office
   const handleSetTurn = useCallback(async (officeNumber: number, turn: TurnType) => {
     if (!selectedUnit) return;
+    const wasComplete = isQuestionnaireComplete(generalData, answers);
     const newTurns = { ...generalData.turns, [officeNumber]: turn };
     const updated: UnitGeneralData = {
       ...generalData,
@@ -562,30 +591,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       refreshPendingCount();
       addToast(`Turno C${officeNumber} guardado localmente`, 'warning');
     }
-  }, [selectedUnit, selectedEntity, user, generalData, answers, addToast, refreshPendingCount]);
+
+    if (!wasComplete && isQuestionnaireComplete(updated, updatedAnswers)) {
+      finishCompletedUnit(selectedUnit.name);
+    }
+  }, [selectedUnit, selectedEntity, user, generalData, answers, addToast, refreshPendingCount, finishCompletedUnit]);
 
   // Save Single Cell Answer (Enter key or Save button)
-  const handleSaveAnswer = useCallback(async (officeNumber: number, question: string, value: number) => {
+  const handleSaveAnswer = useCallback(async (officeNumber: number, question: string, value: number, silentSuccess = false) => {
     if (!selectedUnit || !user || !selectedEntity) return;
 
     const cellKey = `${officeNumber}__${question}`;
     const previous = answers[cellKey];
-    const configuredOffices = generalData.configuredOffices ?? 0;
-    const answerExists = (key: string) => {
-      const answer = answers[key];
-      return answer?.value !== null && answer?.value !== undefined;
-    };
-    const wasComplete = configuredOffices > 0 && Array.from(
-      { length: configuredOffices },
-      (_, index) => index + 1
-    ).every((office) => EQUIPMENT_CATALOG.every((item) => answerExists(`${office}__${item.name}`)));
-    const completesUnit = !wasComplete && configuredOffices > 0 && Array.from(
-      { length: configuredOffices },
-      (_, index) => index + 1
-    ).every((office) => EQUIPMENT_CATALOG.every((item) => {
-      const key = `${office}__${item.name}`;
-      return key === cellKey || answerExists(key);
-    }));
+    const wasComplete = isQuestionnaireComplete(generalData, answers);
 
     // Optimistic local update
     const newAnswer: QuestionAnswer = {
@@ -598,6 +616,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updatedAt: new Date().toISOString(),
       version: (previous?.version || 0) + 1
     };
+    const nextAnswers = { ...answers, [cellKey]: newAnswer };
+    const completesUnit = !wasComplete && isQuestionnaireComplete(generalData, nextAnswers);
 
     setAnswers((prev) => ({ ...prev, [cellKey]: newAnswer }));
     await saveLocalAnswer(newAnswer);
@@ -628,7 +648,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
         setAnswers((prev) => ({ ...prev, [cellKey]: cloudSaved }));
         await saveLocalAnswer(cloudSaved);
-        addToast('Respuesta guardada correctamente.', 'success', `${question} (C${officeNumber}) = ${value}`);
+        if (!silentSuccess) {
+          addToast('Respuesta guardada correctamente.', 'success', `${question} (C${officeNumber}) = ${value}`);
+        }
       } else {
         throw new Error(res.message || 'Error del servidor');
       }
@@ -692,20 +714,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [user]);
 
   // Calculate Progress Stats
-  const totalQuestions = (generalData.configuredOffices ?? 0) * EQUIPMENT_CATALOG.length;
+  let totalQuestions = 0;
   let answeredCount = 0;
   const officeProgress: Record<number, { percentage: number; missing: number; total: number }> = {};
 
   for (let c = 1; c <= (generalData.configuredOffices ?? 0); c++) {
-    let cAnswered = 0;
-    EQUIPMENT_CATALOG.forEach((q) => {
-      const ans = answers[`${c}__${q.name}`];
-      if (ans && ans.value !== null && ans.value !== undefined) {
-        cAnswered++;
-        answeredCount++;
+    const enabledAnswer = answers[`${c}__${OFFICE_ENABLED_QUESTION}`];
+    const requiredQuestions = [
+      ...getRequiredOfficeConfigurationQuestions(generalData.turns[c] || '', enabledAnswer?.value),
+      ...(enabledAnswer?.value === 1 ? EQUIPMENT_CATALOG.map((item) => item.name) : [])
+    ];
+    const cAnswered = requiredQuestions.reduce((count, question) => {
+      if (question === TURN_SELECTION_QUESTION) {
+        if (generalData.turns[c]) {
+          answeredCount++;
+          return count + 1;
+        }
+        return count;
       }
-    });
-    const cTotal = EQUIPMENT_CATALOG.length;
+      if (isDoctorAvailabilityQuestion(question)) {
+        answeredCount++;
+        return count + 1;
+      }
+      const ans = answers[`${c}__${question}`];
+      if (ans && ans.value !== null && ans.value !== undefined) {
+        answeredCount++;
+        return count + 1;
+      }
+      return count;
+    }, 0);
+    const cTotal = requiredQuestions.length;
+    totalQuestions += cTotal;
     const cPercent = cTotal > 0 ? (cAnswered / cTotal) * 100 : 0;
     officeProgress[c] = {
       percentage: Number(cPercent.toFixed(1)),

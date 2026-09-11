@@ -8,9 +8,10 @@ interface QuestionCellProps {
   officeNumber: number;
   question: string;
   turn: TurnType;
+  disabled?: boolean;
 }
 
-export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, question, turn }) => {
+export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, question, turn, disabled = false }) => {
   const {
     answers,
     editingCellKey,
@@ -48,6 +49,7 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
   }, [isEditing, currentAnswer]);
 
   const handleStartEdit = () => {
+    if (disabled) return;
     setEditingCell(cellKey);
   };
 
@@ -117,7 +119,11 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
 
   return (
     <td className="p-1 sm:p-2 text-center align-middle relative group">
-      {isEditing ? (
+      {disabled ? (
+        <div className="flex min-h-10 w-full min-w-[90px] items-center justify-center rounded-lg border border-zinc-600/50 bg-zinc-900/70 px-2 py-2 text-[9px] font-bold text-zinc-400">
+          NO HABILITADO
+        </div>
+      ) : isEditing ? (
         <div className="min-w-[210px] bg-[#1E5B4F]/90 p-2 rounded-lg border border-amber-400 shadow-2xl z-20 relative">
           <div className="flex items-center justify-center gap-1">
             <NumericStepper

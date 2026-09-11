@@ -63,7 +63,7 @@ export const Section1Hero: React.FC = () => {
           </div>
           <div className="flex flex-col items-center gap-1.5 p-2.5 rounded-xl bg-transparent border border-white/20 backdrop-blur-sm">
             <Stethoscope className="w-5 h-5 text-[#A57F2C]" />
-            <span className="font-medium text-center">64 Equipos</span>
+            <span className="font-medium text-center">65 Equipos</span>
           </div>
           <div className="flex flex-col items-center gap-1.5 p-2.5 rounded-xl bg-transparent border border-white/20 backdrop-blur-sm">
             <FileSpreadsheet className="w-5 h-5 text-[#A57F2C]" />
