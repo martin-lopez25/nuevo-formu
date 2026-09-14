@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, Check, Save } from 'lucide-react';
+import { AlertTriangle, Check, ChevronLeft, ChevronRight, Save } from 'lucide-react';
 
 const DAYS = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
 
@@ -286,6 +286,31 @@ export const FillingInstructionsCabinet: React.FC = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <div className="mt-4">
+                <p className="mb-2 text-sm font-bold text-[#1E5B4F]">Opciones para facilitar la captura de las 65 preguntas</p>
+                <div className="rounded-md border border-[#1E5B4F]/25 bg-[#1E5B4F] p-3 text-white shadow-lg" aria-label="Captura de las opciones Bloques de 10, Solo pendientes y Ver las 65">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap gap-1 rounded-md border border-white/15 bg-black/20 p-1">
+                      <span className="rounded bg-amber-500 px-3 py-2 text-[11px] font-bold text-black">Bloques de 10</span>
+                      <span className="rounded px-3 py-2 text-[11px] font-bold text-zinc-200">Solo pendientes (63)</span>
+                      <span className="rounded px-3 py-2 text-[11px] font-bold text-zinc-200">Ver las 65</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-8 w-8 items-center justify-center rounded border border-white/20 bg-black/20 text-white/30">
+                        <ChevronLeft className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-24 text-center text-xs font-bold text-amber-200">Bloque 1 de 7</span>
+                      <span className="flex h-8 w-8 items-center justify-center rounded border border-white/20 bg-black/20 text-white">
+                        <ChevronRight className="h-4 w-4" />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-zinc-600">
+                  Use <strong>Bloques de 10</strong> para avanzar poco a poco, <strong>Solo pendientes</strong> para mostrar únicamente lo que falta o <strong>Ver las 65</strong> para consultar la matriz completa.
+                </p>
               </div>
             </section>
           </main>
