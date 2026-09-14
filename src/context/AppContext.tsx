@@ -211,7 +211,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return;
       }
 
-      const queue = await getPendingSyncQueue();
+      const queue = (await getPendingSyncQueue()).filter(
+        (item) => item.clues.trim().toUpperCase() === selectedUnit.clues.trim().toUpperCase()
+      );
       if (queue.length === 0) {
         addToast('Sincronizado', 'success', 'Todos los datos están al día con la nube.');
         setIsSyncing(false);
@@ -513,44 +515,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsZeroOfficesModalOpen(true);
       return;
     }
-    setGeneralData((prev) => {
-      const newTurns = { ...prev.turns };
-      if (safeCount === 0) {
-        Object.keys(newTurns).forEach((key) => delete newTurns[Number(key)]);
-      }
-      for (let i = 1; i <= safeCount; i++) {
-        if (newTurns[i] === undefined) newTurns[i] = '';
-      }
-      const updated: UnitGeneralData = {
-        ...prev,
-        entidad: selectedEntity || selectedUnit?.entity || prev.entidad,
-        usuarioNombre: user?.name || prev.usuarioNombre || '',
-        usuarioEmail: user?.email || prev.usuarioEmail || '',
-        configuredOffices: safeCount,
-        turns: newTurns,
-        updatedAt: new Date().toISOString()
-      };
-      saveLocalGeneralData(updated);
-      if (selectedUnit) {
-        saveUnitGeneral(selectedUnit.clues, updated)
-          .then(() => {
-            addToast(`Consultorios para captura guardados: ${safeCount}`, 'success');
-            if (safeCount === 0) finishCompletedUnit(selectedUnit.name);
-          })
-          .catch(async () => {
-            await addToSyncQueue({
-              action: 'save_general',
-              clues: selectedUnit.clues,
-              payload: updated
-            });
-            await refreshPendingCount();
-            addToast('Consultorios guardados localmente', 'warning', 'Se sincronizarán al reconectar.');
-            if (safeCount === 0) finishCompletedUnit(selectedUnit.name);
+    const newTurns = { ...generalData.turns };
+    if (safeCount === 0) {
+      Object.keys(newTurns).forEach((key) => delete newTurns[Number(key)]);
+    }
+    for (let i = 1; i <= safeCount; i++) {
+      if (newTurns[i] === undefined) newTurns[i] = '';
+    }
+    const updated: UnitGeneralData = {
+      ...generalData,
+      entidad: selectedEntity || selectedUnit?.entity || generalData.entidad,
+      usuarioNombre: user?.name || generalData.usuarioNombre || '',
+      usuarioEmail: user?.email || generalData.usuarioEmail || '',
+      configuredOffices: safeCount,
+      turns: newTurns,
+      updatedAt: new Date().toISOString()
+    };
+
+    setGeneralData(updated);
+    void saveLocalGeneralData(updated);
+    if (safeCount === 0 && selectedUnit) finishCompletedUnit(selectedUnit.name);
+
+    if (selectedUnit) {
+      saveUnitGeneral(selectedUnit.clues, updated)
+        .then(() => {
+          addToast(`Consultorios para captura guardados: ${safeCount}`, 'success');
+        })
+        .catch(async () => {
+          await addToSyncQueue({
+            action: 'save_general',
+            clues: selectedUnit.clues,
+            payload: updated
           });
-      }
-      return updated;
-    });
-  }, [selectedUnit, selectedEntity, user, answers, addToast, refreshPendingCount, finishCompletedUnit]);
+          await refreshPendingCount();
+          addToast('Consultorios guardados localmente', 'warning', 'Se sincronizarán al reconectar.');
+        });
+    }
+  }, [selectedUnit, selectedEntity, user, generalData, answers, addToast, refreshPendingCount, finishCompletedUnit]);
 
   const handleConfirmZeroOffices = useCallback(async () => {
     if (!selectedUnit) return;

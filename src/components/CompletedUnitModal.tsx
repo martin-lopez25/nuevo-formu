@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Building2, CheckCircle2, LoaderCircle, Save } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
@@ -25,6 +25,10 @@ export const CompletedUnitModal: React.FC = () => {
     confirmCompletedUnit
   } = useApp();
   const [phase, setPhase] = useState<'review' | 'saving' | 'transition'>('review');
+
+  useEffect(() => {
+    setPhase('review');
+  }, [completedUnitName]);
 
   if (!completedUnitName || !selectedUnit) return null;
 
