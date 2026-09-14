@@ -4,6 +4,7 @@ import { Header } from './components/Header';
 import { AvanceCharts, AvanceSummaryCards, StatCards } from './components/Charts';
 import { DataTable } from './components/DataTable';
 import { cargarTablasFormulario } from './data';
+import questions from '../../src/data/questions.json';
 import type { DashboardStats, DataRow, EntidadChart, InternetPieItem, TopFaltanteChart, CluesGeoItem } from './types';
 
 type DataTabKey = 'cruda' | 'clues' | 'estado' | 'faltantes' | 'tabla-avance' | 'tabla-entidades' | 'tabla-unidades' | 'faltantes-estados' | 'tabla-faltantes-estados';
@@ -17,6 +18,19 @@ function toText(value: unknown): string {
 function normalizeKey(value: unknown): string {
   return toText(value).toUpperCase();
 }
+
+function questionColumnKey(value: string): string {
+  return `${value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')}_consultorio`;
+}
+
+const QUESTION_COLUMN_LABELS = new Map(
+  (questions as Array<{ name: string }>).map((question) => [questionColumnKey(question.name), question.name]),
+);
 
 function toNumber(value: unknown): number {
   const num = Number(value);
@@ -221,13 +235,13 @@ export default function App() {
       unidadesInternet: cluesConInternet.size,
       consultoriosTotales: resumen.reduce((s, r) => s + toNumber(r.consultorio), 0),
       pctLlenado: (() => {
-        const FIXED = new Set(['entidad', 'clues_imb', 'nombre_de_la_unidad', 'internet', 'consultorios_habilitados', 'consultorio', 'turno_consultorio', 'latitud', 'longitud']);
+        const FIXED = new Set(['entidad', 'clues_imb', 'nombre_de_la_unidad', 'internet', 'consultorios', 'consultorio', 'turno_consultorio', 'habilitado', 'causas_inhabilitacion', 'medicos_generales', 'latitud', 'longitud']);
         let filled = 0, total = 0;
         for (const row of resultado) {
           for (const [key, value] of Object.entries(row)) {
             if (FIXED.has(key)) continue;
             total++;
-            if (value !== null && value !== undefined && value !== '' && value !== 0 && value !== false) filled++;
+            if (value !== null && value !== undefined && value !== '') filled++;
           }
         }
         return total > 0 ? +(filled / total * 100).toFixed(1) : 0;
@@ -241,7 +255,10 @@ export default function App() {
       'clues_imb',
       'nombre_de_la_unidad',
       'internet',
-      'consultorios_habilitados',
+      'consultorios',
+      'habilitado',
+      'causas_inhabilitacion',
+      'medicos_generales',
       'consultorio',
       'turno_consultorio',
       'latitud',
@@ -305,7 +322,7 @@ export default function App() {
         return {
           entidad,
           unidades: toNumber(row.unidades_respondieron),
-          consultoriosHabilitados: toNumber(completion?.consultorios),
+          consultoriosConfigurados: toNumber(completion?.consultorios),
           consultoriosLevantados: toNumber(completion?.consultorios),
           pctLlenado: toNumber(completion?.porcentaje_con_valor),
         };
@@ -331,8 +348,10 @@ export default function App() {
       .filter((key) => includeFechaRegistro || key !== 'fecha_registro')
       .map((key) => ({
       key,
-      label: key,
-      render: (row: DataRow) => formatCellValue(row[key], key),
+      label: QUESTION_COLUMN_LABELS.get(key) ?? key,
+      render: (row: DataRow) => QUESTION_COLUMN_LABELS.has(key) && row[key] == null
+        ? ''
+        : formatCellValue(row[key], key),
       }));
   };
 
@@ -365,7 +384,7 @@ export default function App() {
     return porEntidad.map((row) => ({
       entidad: row.entidad,
       unidades: row.unidades,
-      consultorios_habilitados: row.consultoriosHabilitados,
+      consultorios_configurados: row.consultoriosConfigurados,
       consultorios_levantados: row.consultoriosLevantados,
       porcentaje_llenado: row.pctLlenado,
     }));

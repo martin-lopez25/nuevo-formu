@@ -2,6 +2,7 @@ import React, { FormEvent, useState } from 'react';
 import { motion } from 'motion/react';
 import { Activity, Building2, CheckCircle, Eye, EyeOff, LogOut, MapPinned, ShieldCheck, Stethoscope, TrendingUp, User, X } from 'lucide-react';
 import { authenticateAdmin, logoutAdmin } from '../services/api.ts';
+import { LoadingOverlay } from './LoadingOverlay.tsx';
 import entities from '../data/entities.json';
 
 interface SecretAdminModalProps {
@@ -25,6 +26,7 @@ export const SecretAdminModal: React.FC<SecretAdminModalProps> = ({ isOpen, onCl
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isOpeningReport, setIsOpeningReport] = useState(false);
 
   if (!isOpen) return null;
 
@@ -34,13 +36,16 @@ export const SecretAdminModal: React.FC<SecretAdminModalProps> = ({ isOpen, onCl
     setLoginError('');
     try {
       const token = await authenticateAdmin(username, password);
-      setAdminToken(token);
       setLoginError('');
       setUsername('');
       setPassword('');
+      setIsOpeningReport(true);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      setAdminToken(token);
     } catch (error) {
       setLoginError(error instanceof Error ? error.message : 'No fue posible iniciar sesión');
     } finally {
+      setIsOpeningReport(false);
       setIsLoading(false);
     }
   };
@@ -58,6 +63,10 @@ export const SecretAdminModal: React.FC<SecretAdminModalProps> = ({ isOpen, onCl
       } catch (_) {}
     }
   };
+
+  if (isOpeningReport) {
+    return <LoadingOverlay title="Acceso autorizado" message="Cargando reporte" />;
+  }
 
   if (adminToken) {
     return (

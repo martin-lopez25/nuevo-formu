@@ -33,25 +33,6 @@ function requireSupabase() {
   return supabase;
 }
 
-type ScheduleEntry = { turno: OperationalTurn; dia: string; existe_medico: boolean };
-type StoredSchedules = Partial<Record<OperationalTurn, {
-  dias_con_horario: string[];
-  dias_con_medico: string[];
-}>>;
-
-function parseStoredSchedules(value: unknown): ScheduleEntry[] {
-  if (Array.isArray(value)) return value as ScheduleEntry[];
-  if (!value || typeof value !== 'object') return [];
-
-  return Object.entries(value as StoredSchedules).flatMap(([turno, schedule]) =>
-    (schedule?.dias_con_horario || []).map((dia) => ({
-      turno: turno as OperationalTurn,
-      dia,
-      existe_medico: schedule?.dias_con_medico?.includes(dia) || false
-    }))
-  );
-}
-
 function parseStoredCauses(value: unknown): string[] {
   if (Array.isArray(value)) return value.filter((cause): cause is string => typeof cause === 'string');
   if (typeof value !== 'string') return [];
@@ -211,13 +192,15 @@ export interface AdminResponseRow {
   clues_imb: string;
   nombre_de_la_unidad: string | null;
   internet: string | null;
-  consultorios_habilitados: number | null;
-  consultorios_inhabilitados: number | null;
-  total_consultorios_medicina_general: number | null;
+  consultorios: number | null;
   consultorio: number | null;
   pregunta: string | null;
   valor: number | null;
   turno: string | null;
+  habilitado: boolean | null;
+  causas_inhabilitacion: string | null;
+  medicos_generales: number | null;
+  medico_disponible: boolean | null;
 }
 
 async function adminPassword(value: string) {
@@ -375,7 +358,6 @@ export async function fetchUnitResponses(clues: string): Promise<{ answers: Reco
     const turns: UnitGeneralData['turns'] = {};
     const rows = responseResult.data || [];
     const config = rows.find((row) => row.tipo_registro === 'unidad');
-    const legacyOfficeCount = rows.find((row) => row.tipo_registro === 'respuesta' && row.pregunta === 'consultorios');
 
     rows.filter((row) => row.tipo_registro === 'consultorio').forEach((office) => {
       const officeNumber = Number(office.consultorio);
@@ -427,19 +409,6 @@ export async function fetchUnitResponses(clues: string): Promise<{ answers: Reco
           updatedAt
         };
       }
-      parseStoredSchedules(office.horarios).forEach((schedule) => {
-        const scheduleQuestion = getOfficeScheduleQuestion(schedule.turno, schedule.dia);
-        const doctorQuestion = getDoctorAvailabilityQuestion(schedule.turno, schedule.dia);
-        answers[`${officeNumber}__${scheduleQuestion}`] = {
-          clues: normalizedClues, officeNumber, question: scheduleQuestion, value: 1,
-          status: 'saved_cloud', turn: schedule.turno, updatedAt
-        };
-        answers[`${officeNumber}__${doctorQuestion}`] = {
-          clues: normalizedClues, officeNumber, question: doctorQuestion,
-          value: schedule.existe_medico ? 1 : 0,
-          status: 'saved_cloud', turn: schedule.turno, updatedAt
-        };
-      });
     });
 
     rows.filter((row) => row.tipo_registro === 'horario' && row.habilitado).forEach((scheduleRow) => {
@@ -486,17 +455,7 @@ export async function fetchUnitResponses(clues: string): Promise<{ answers: Reco
       usuarioNombre: config.usuario_nombre || '',
       usuarioEmail: config.usuario_email || '',
       hasInternet: config.internet || 'PENDIENTE',
-      hasTemporarilyClosedOffices: config.consultorios_inhabilitados === null
-        ? 'PENDIENTE'
-        : Number(config.consultorios_inhabilitados) > 0 ? 'SI' : 'NO',
-      enabledOffices: config.consultorios_habilitados === null ? null : Number(config.consultorios_habilitados),
-      unoperatedOffices: config.consultorios_inhabilitados === null ? null : Number(config.consultorios_inhabilitados),
-      totalGeneralOffices: config.total_consultorios_medicina_general === null
-        ? null
-        : Number(config.total_consultorios_medicina_general),
-      configuredOffices: config.consultorios === null || config.consultorios === undefined
-        ? legacyOfficeCount ? Number(legacyOfficeCount.consultorio) : null
-        : Number(config.consultorios),
+      configuredOffices: config.consultorios == null ? null : Number(config.consultorios),
       turns,
       updatedAt: config.fecha_registro || new Date().toISOString()
     } satisfies UnitGeneralData : undefined;
@@ -601,9 +560,6 @@ export async function saveUnitGeneral(clues: string, generalData: UnitGeneralDat
       clues_imb: normalizedClues,
       nombre_de_la_unidad: generalData.nombreUnidad || '',
       internet: generalData.hasInternet,
-      consultorios_habilitados: generalData.enabledOffices,
-      consultorios_inhabilitados: generalData.unoperatedOffices,
-      total_consultorios_medicina_general: generalData.totalGeneralOffices,
       consultorios: generalData.configuredOffices,
       consultorio: null,
       pregunta: null,

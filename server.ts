@@ -45,10 +45,6 @@ interface StoredUnitConfig {
   entidad: string;
   usuarioNombre: string;
   hasInternet: 'SI' | 'NO' | 'PENDIENTE';
-  hasTemporarilyClosedOffices: 'SI' | 'NO' | 'PENDIENTE';
-  enabledOffices: number | null;
-  unoperatedOffices: number | null;
-  totalGeneralOffices: number | null;
   configuredOffices: number | null;
   turns: Record<number, string>;
   updatedAt: string;
@@ -110,7 +106,6 @@ function answerToDatabase(answer: StoredAnswer) {
     clues_imb: answer.clues,
     nombre_de_la_unidad: answer.nombreUnidad,
     internet: null,
-    consultorios_habilitados: null,
     consultorio: answer.numeroConsultorio,
     pregunta: answer.pregunta,
     valor: answer.valor,
@@ -146,27 +141,9 @@ function configToDatabase(config: StoredUnitConfig) {
     usuario_nombre: config.usuarioNombre,
     clues_imb: config.clues,
     internet: config.hasInternet,
-    consultorios_habilitados: config.enabledOffices,
-    consultorios_inhabilitados: config.unoperatedOffices,
-    total_consultorios_medicina_general: config.totalGeneralOffices,
+    consultorios: config.configuredOffices,
     consultorio: null,
     pregunta: null,
-    valor: null,
-    turno: null
-  };
-}
-
-function officeCountToDatabase(config: StoredUnitConfig) {
-  return {
-    fecha_registro: config.updatedAt,
-    tipo_registro: 'respuesta',
-    entidad: config.entidad,
-    usuario_nombre: config.usuarioNombre,
-    clues_imb: config.clues,
-    internet: null,
-    consultorios_habilitados: null,
-    consultorio: config.configuredOffices,
-    pregunta: 'consultorios',
     valor: null,
     turno: null
   };
@@ -178,15 +155,7 @@ function configFromDatabase(row: any): StoredUnitConfig {
     entidad: row.entidad || '',
     usuarioNombre: row.usuario_nombre || '',
     hasInternet: row.internet || 'PENDIENTE',
-    hasTemporarilyClosedOffices: row.consultorios_inhabilitados === null
-      ? 'PENDIENTE'
-      : Number(row.consultorios_inhabilitados) > 0 ? 'SI' : 'NO',
-    enabledOffices: row.consultorios_habilitados === null ? null : Number(row.consultorios_habilitados),
-    unoperatedOffices: row.consultorios_inhabilitados === null ? null : Number(row.consultorios_inhabilitados),
-    totalGeneralOffices: row.total_consultorios_medicina_general === null
-      ? null
-      : Number(row.total_consultorios_medicina_general),
-    configuredOffices: null,
+    configuredOffices: row.consultorios == null ? null : Number(row.consultorios),
     turns: {},
     updatedAt: row.fecha_registro
   };
@@ -353,21 +322,16 @@ app.get('/api/unidades/:clues/respuestas/', async (req, res) => {
     const sb = getSupabase();
 
     if (sb) {
-      const [answersResult, configResult, officeCountResult] = await Promise.all([
+      const [answersResult, configResult] = await Promise.all([
         sb.from('respuestas').select('*').eq('clues_imb', clues).eq('tipo_registro', 'respuesta').neq('pregunta', 'consultorios'),
-        sb.from('respuestas').select('*').eq('clues_imb', clues).eq('tipo_registro', 'unidad').maybeSingle(),
-        sb.from('respuestas').select('consultorio').eq('clues_imb', clues).eq('tipo_registro', 'respuesta').eq('pregunta', 'consultorios').maybeSingle()
+        sb.from('respuestas').select('*').eq('clues_imb', clues).eq('tipo_registro', 'unidad').maybeSingle()
       ]);
       if (answersResult.error) throw answersResult.error;
-      if (officeCountResult.error) throw officeCountResult.error;
       unitAnswers = (answersResult.data || []).map(answerFromDatabase);
       if (configResult.error) {
         console.warn('Unit configuration unavailable:', configResult.error.message);
       } else {
         general = configResult.data ? configFromDatabase(configResult.data) : null;
-      }
-      if (general && officeCountResult.data) {
-        general.configuredOffices = Number(officeCountResult.data.consultorio);
       }
       if (general) {
         unitAnswers.forEach((answer) => {
@@ -449,10 +413,6 @@ app.post('/api/unidades/:clues/configuracion/', async (req, res) => {
       entidad: body.entidad || '',
       usuarioNombre: body.usuarioNombre || '',
       hasInternet: body.hasInternet || 'PENDIENTE',
-      hasTemporarilyClosedOffices: body.hasTemporarilyClosedOffices || 'PENDIENTE',
-      enabledOffices: body.enabledOffices === null ? null : Number(body.enabledOffices),
-      unoperatedOffices: body.unoperatedOffices === null ? null : Number(body.unoperatedOffices),
-      totalGeneralOffices: body.totalGeneralOffices === null ? null : Number(body.totalGeneralOffices),
       configuredOffices: body.configuredOffices == null ? null : Number(body.configuredOffices),
       turns: body.turns || {},
       updatedAt: new Date().toISOString()
@@ -463,22 +423,12 @@ app.post('/api/unidades/:clues/configuracion/', async (req, res) => {
     const sb = getSupabase();
     if (sb) {
       const row = configToDatabase(config);
-      const officeCountRow = officeCountToDatabase(config);
       const existing = await sb.from('respuestas').select('clues_imb').eq('clues_imb', clues).eq('tipo_registro', 'unidad').maybeSingle();
       if (existing.error) throw existing.error;
       const { error } = existing.data
         ? await sb.from('respuestas').update(row).eq('clues_imb', clues).eq('tipo_registro', 'unidad')
         : await sb.from('respuestas').insert(row);
       if (error) throw error;
-
-      if (config.configuredOffices !== null) {
-        const existingCount = await sb.from('respuestas').select('clues_imb').eq('clues_imb', clues).eq('tipo_registro', 'respuesta').eq('pregunta', 'consultorios').maybeSingle();
-        if (existingCount.error) throw existingCount.error;
-        const { error: countError } = existingCount.data
-          ? await sb.from('respuestas').update(officeCountRow).eq('clues_imb', clues).eq('tipo_registro', 'respuesta').eq('pregunta', 'consultorios')
-          : await sb.from('respuestas').insert(officeCountRow);
-        if (countError) throw countError;
-      }
       await updateOfficeTurns(config, sb);
     }
 
@@ -665,10 +615,6 @@ app.post('/api/sincronizar/', async (req, res) => {
           entidad: p.entidad || '',
           usuarioNombre: p.usuarioNombre || '',
           hasInternet: p.hasInternet || 'PENDIENTE',
-          hasTemporarilyClosedOffices: p.hasTemporarilyClosedOffices || 'PENDIENTE',
-          enabledOffices: p.enabledOffices === null ? null : Number(p.enabledOffices),
-          unoperatedOffices: p.unoperatedOffices === null ? null : Number(p.unoperatedOffices),
-          totalGeneralOffices: p.totalGeneralOffices === null ? null : Number(p.totalGeneralOffices),
           configuredOffices: p.configuredOffices == null ? null : Number(p.configuredOffices),
           turns: p.turns || {},
           updatedAt: new Date().toISOString()
@@ -682,15 +628,6 @@ app.post('/api/sincronizar/', async (req, res) => {
             ? await sb.from('respuestas').update(row).eq('clues_imb', normClues).eq('tipo_registro', 'unidad')
             : await sb.from('respuestas').insert(row);
           if (error) throw error;
-          if (config.configuredOffices !== null) {
-            const officeCountRow = officeCountToDatabase(config);
-            const existingCount = await sb.from('respuestas').select('clues_imb').eq('clues_imb', normClues).eq('tipo_registro', 'respuesta').eq('pregunta', 'consultorios').maybeSingle();
-            if (existingCount.error) throw existingCount.error;
-            const { error: countError } = existingCount.data
-              ? await sb.from('respuestas').update(officeCountRow).eq('clues_imb', normClues).eq('tipo_registro', 'respuesta').eq('pregunta', 'consultorios')
-              : await sb.from('respuestas').insert(officeCountRow);
-            if (countError) throw countError;
-          }
           await updateOfficeTurns(config, sb);
         }
         syncedIds.push(item.id);

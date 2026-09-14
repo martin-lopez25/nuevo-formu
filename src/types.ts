@@ -12,8 +12,6 @@ export interface MedicalUnit {
   entity: string;
   municipality?: string;
   hasInternet?: 'SI' | 'NO' | 'PENDIENTE';
-  enabledOffices?: number;
-  unoperatedOffices?: number;
   totalOffices?: number;
   lastUpdated?: string;
 }
@@ -47,10 +45,6 @@ export interface UnitGeneralData {
   usuarioNombre?: string;
   usuarioEmail?: string;
   hasInternet: 'SI' | 'NO' | 'PENDIENTE';
-  hasTemporarilyClosedOffices: 'SI' | 'NO' | 'PENDIENTE';
-  enabledOffices: number | null;
-  unoperatedOffices: number | null;
-  totalGeneralOffices: number | null;
   configuredOffices: number | null;
   turns: Record<number, TurnType>; // officeNumber -> TurnType
   updatedAt: string;

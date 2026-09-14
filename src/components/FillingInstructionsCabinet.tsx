@@ -58,6 +58,7 @@ export const FillingInstructionsCabinet: React.FC = () => {
               <div>
                 <p className="text-[10px] font-extrabold uppercase tracking-widest text-amber-300">Apoyo para la captura</p>
                 <h2 id="filling-instructions-title" className="text-xl font-extrabold sm:text-2xl">Instrucciones de llenado</h2>
+                <p className="mt-1 text-xs text-white/85 sm:text-sm">Para salir de las instrucciones, haga clic nuevamente en el botiquín.</p>
               </div>
             </div>
           </header>

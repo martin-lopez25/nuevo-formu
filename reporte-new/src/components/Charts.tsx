@@ -16,6 +16,7 @@ import {
 } from 'recharts';
 import { Layers3, Building2, Globe, ClipboardList, X, MapPin, Download, type LucideIcon } from 'lucide-react';
 import maplibregl from 'maplibre-gl';
+import questions from '../../../src/data/questions.json';
 import type { DashboardStats, CluesGeoItem, DataRow, EntidadChart, InternetPieItem, TopFaltanteChart } from '../types';
 import { exportarExcel } from '../exportExcel';
 
@@ -35,7 +36,10 @@ const FIXED_COLUMNS = new Set([
   'clues_imb',
   'nombre_de_la_unidad',
   'internet',
-  'consultorios_habilitados',
+  'consultorios',
+  'habilitado',
+  'causas_inhabilitacion',
+  'medicos_generales',
   'consultorio',
   'turno_consultorio',
   'latitud',
@@ -66,11 +70,24 @@ function isZeroLike(value: unknown): boolean {
   return text === 'false' || text === 'no' || text === 'nan';
 }
 
+function normalizeInsumoKey(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+const INSUMO_LABEL_BY_KEY = new Map(
+  (questions as Array<{ name: string }>).map((question) => [normalizeInsumoKey(question.name), question.name]),
+);
+
 function formatInsumoName(key: string): string {
-  return key
+  const normalizedKey = key
     .replace(/_consultorio(_\d+)?$/i, '')
-    .replace(/_/g, ' ')
     .trim();
+  return INSUMO_LABEL_BY_KEY.get(normalizedKey) ?? normalizedKey.replace(/_/g, ' ');
 }
 
 type StatKey =
@@ -142,8 +159,9 @@ function pct2Digits(value: number): string {
 }
 
 function pctLabel(actual: number, expected: number): string {
-  if (expected <= 0) return '0.0%';
-  return `${((actual / expected) * 100).toFixed(1)}%`;
+  if (expected <= 0 || actual === 0) return '0%';
+  const rounded = ((actual / expected) * 100).toFixed(1);
+  return Number(rounded) === 0 ? '0%' : `${rounded}%`;
 }
 
 function StatCard({
@@ -159,7 +177,7 @@ function StatCard({
 }) {
   const { icon: Icon, label, bg, iconBg, iconColor, valueColor, border, isPercent } = def;
   const displayValue = isPercent
-    ? `${value.toFixed(1)}%`
+    ? (value === 0 ? '0%' : `${value.toFixed(1)}%`)
     : (typeof expected === 'number' ? pctLabel(value, expected) : value.toLocaleString('es-MX'));
   return (
     <div className={`group relative overflow-hidden rounded-2xl border p-5 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg ${border} ${bg}`}>
@@ -397,10 +415,10 @@ function InternetChart({ internetPie }: { internetPie: InternetPieItem[] }) {
 function ConsultoriosChart({ porEntidad }: { porEntidad: EntidadChart[] }) {
   const data = porEntidad.map((e) => ({
     entidad: e.entidad.length > 10 ? e.entidad.slice(0, 10) + '.' : e.entidad,
-    habilitados: e.consultoriosHabilitados,
+    configurados: e.consultoriosConfigurados,
     levantados: e.consultoriosLevantados,
-    pct: e.consultoriosHabilitados > 0
-      ? +((e.consultoriosLevantados / e.consultoriosHabilitados) * 100).toFixed(1)
+    pct: e.consultoriosConfigurados > 0
+      ? +((e.consultoriosLevantados / e.consultoriosConfigurados) * 100).toFixed(1)
       : 0,
   }));
   return (
@@ -412,9 +430,9 @@ function ConsultoriosChart({ porEntidad }: { porEntidad: EntidadChart[] }) {
         <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11, fill: '#9CA3AF' }} />
         <Tooltip contentStyle={tooltipStyle} formatter={(v: number, name: string) => [
           name === 'pct' ? `${v}%` : formatTooltipNumber(v),
-          name === 'pct' ? '% levantado' : name === 'habilitados' ? 'Habilitados' : 'Levantados',
+          name === 'pct' ? '% levantado' : name === 'configurados' ? 'Configurados' : 'Levantados',
         ]} cursor={{ fill: '#F0FDFA' }} />
-        <Bar yAxisId="left" dataKey="habilitados" name="habilitados" fill="#99F6E4" radius={[4, 4, 0, 0]} />
+        <Bar yAxisId="left" dataKey="configurados" name="configurados" fill="#99F6E4" radius={[4, 4, 0, 0]} />
         <Bar yAxisId="left" dataKey="levantados" name="levantados" fill="#0D9488" radius={[4, 4, 0, 0]} />
         <Line yAxisId="right" type="monotone" dataKey="pct" name="pct" stroke="#A57F2C" strokeWidth={2} dot={{ fill: '#A57F2C', r: 3 }} />
       </ComposedChart>
@@ -864,6 +882,8 @@ function MapModal({ onClose, porEntidad, cluesGeo = [] }: {
 function InsumoZeroFinder({ resultado = [] }: { resultado?: DataRow[] }) {
   const [query, setQuery] = useState('');
   const [selectedEntidad, setSelectedEntidad] = useState('');
+  const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
 
   const getCluesId = (row: DataRow): string => {
     const clues = String(row.clues_imb || row.clues || '').trim();
@@ -914,6 +934,21 @@ function InsumoZeroFinder({ resultado = [] }: { resultado?: DataRow[] }) {
 
     return insumoKeys.find((k) => normalizeText(formatInsumoName(k)) === text) ?? '';
   }, [query, insumoKeys]);
+
+  const suggestions = useMemo(() => {
+    const text = normalizeText(query);
+    return insumoKeys
+      .filter((key) => {
+        if (!text) return true;
+        return normalizeText(key).includes(text) || normalizeText(formatInsumoName(key)).includes(text);
+      });
+  }, [insumoKeys, query]);
+
+  const selectInsumo = (key: string) => {
+    setQuery(formatInsumoName(key));
+    setIsSuggestionsOpen(false);
+    setActiveSuggestionIndex(0);
+  };
 
   const entidades = useMemo(() => {
     const setEntidades = new Set<string>();
@@ -1034,14 +1069,71 @@ function InsumoZeroFinder({ resultado = [] }: { resultado?: DataRow[] }) {
 
       <div className="space-y-3">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            list="insumos-list"
-            placeholder="Ejemplo: bascula electronica con estadimetro"
-            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setIsSuggestionsOpen(true);
+                setActiveSuggestionIndex(0);
+              }}
+              onFocus={() => setIsSuggestionsOpen(true)}
+              onBlur={() => window.setTimeout(() => setIsSuggestionsOpen(false), 120)}
+              onKeyDown={(event) => {
+                if (event.key === 'ArrowDown') {
+                  event.preventDefault();
+                  setIsSuggestionsOpen(true);
+                  setActiveSuggestionIndex((current) => Math.min(current + 1, suggestions.length - 1));
+                } else if (event.key === 'ArrowUp') {
+                  event.preventDefault();
+                  setActiveSuggestionIndex((current) => Math.max(current - 1, 0));
+                } else if (event.key === 'Enter' && isSuggestionsOpen && suggestions.length > 0) {
+                  event.preventDefault();
+                  selectInsumo(suggestions[activeSuggestionIndex] ?? suggestions[0]);
+                } else if (event.key === 'Escape') {
+                  setIsSuggestionsOpen(false);
+                }
+              }}
+              placeholder="Escribe el nombre de un insumo"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={isSuggestionsOpen}
+              aria-controls="insumos-suggestions"
+              aria-activedescendant={isSuggestionsOpen && suggestions.length > 0 ? `insumo-option-${activeSuggestionIndex}` : undefined}
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+            />
+
+            {isSuggestionsOpen && (
+              <div
+                id="insumos-suggestions"
+                role="listbox"
+                className="absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-xl"
+              >
+                {suggestions.length > 0 ? suggestions.map((key, index) => (
+                  <button
+                    id={`insumo-option-${index}`}
+                    key={key}
+                    type="button"
+                    role="option"
+                    aria-selected={index === activeSuggestionIndex}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onMouseEnter={() => setActiveSuggestionIndex(index)}
+                    onClick={() => selectInsumo(key)}
+                    className={`block w-full px-3 py-2 text-left text-sm transition-colors ${
+                      index === activeSuggestionIndex
+                        ? 'bg-emerald-50 font-semibold text-imss-green'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {formatInsumoName(key)}
+                  </button>
+                )) : (
+                  <p className="px-3 py-3 text-sm text-gray-500">No hay insumos que coincidan con la búsqueda.</p>
+                )}
+              </div>
+            )}
+          </div>
           <select
             value={selectedEntidad}
             onChange={(e) => setSelectedEntidad(e.target.value)}
@@ -1053,14 +1145,10 @@ function InsumoZeroFinder({ resultado = [] }: { resultado?: DataRow[] }) {
             ))}
           </select>
         </div>
-        <datalist id="insumos-list">
-          {insumoKeys.map((key) => (
-            <option key={key} value={formatInsumoName(key)} />
-          ))}
-        </datalist>
-
         {!query.trim() ? (
           <p className="text-xs text-gray-500">Hay {insumoKeys.length.toLocaleString('es-MX')} insumos disponibles para buscar.</p>
+        ) : !selectedInsumoKey && suggestions.length > 0 ? (
+          <p className="text-xs text-gray-500">Seleccione una de las sugerencias para consultar las unidades.</p>
         ) : !selectedInsumoKey ? (
           <p className="text-xs font-medium text-rose-600">No encontré ese insumo. Prueba con una opción del autocompletado.</p>
         ) : (
@@ -1555,7 +1643,7 @@ export function Charts({
         </ChartCard>
       </div>
 
-      <ChartCard title="Resumen por entidad" subtitle="Unidades, consultorios habilitados y consultorios levantados">
+      <ChartCard title="Resumen por entidad" subtitle="Unidades, consultorios configurados y consultorios levantados">
         <ResponsiveContainer width="100%" height={320}>
           <BarChart data={porEntidad} margin={{ top: 0, right: 10, left: 0, bottom: 60 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
@@ -1564,7 +1652,7 @@ export function Charts({
             <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatTooltipNumber(v)} cursor={{ fill: '#F9FAFB' }} />
             <Legend verticalAlign="top" iconType="circle" wrapperStyle={{ fontSize: '11px', paddingBottom: '8px', color: '#6B7280' }} />
             <Bar dataKey="unidades" name="Unidades" fill="#002F2A" />
-            <Bar dataKey="consultoriosHabilitados" name="Consultorios Habilitados" fill="#A57F2C" />
+            <Bar dataKey="consultoriosConfigurados" name="Consultorios Configurados" fill="#A57F2C" />
             <Bar dataKey="consultoriosLevantados" name="Consultorios Levantados" fill="#1A6B5E" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>

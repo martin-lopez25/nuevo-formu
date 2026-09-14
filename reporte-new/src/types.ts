@@ -64,7 +64,7 @@ export interface InternetPieItem {
 export interface EntidadChart {
   entidad: string;
   unidades: number;
-  consultoriosHabilitados: number;
+  consultoriosConfigurados: number;
   consultoriosLevantados: number;
   pctLlenado: number;
 }

@@ -90,11 +90,6 @@ interface AppContextType {
   handleConfigureOffices: (count: number) => void;
   handleConfirmZeroOffices: () => Promise<void>;
   handleSetInternet: (status: 'SI' | 'NO' | 'PENDIENTE') => Promise<void>;
-  handleSetGeneralOfficeAvailability: (
-    status: 'SI' | 'NO',
-    enabledOffices: number | null,
-    unoperatedOffices: number | null
-  ) => Promise<void>;
   handleSetTurn: (officeNumber: number, turn: TurnType) => Promise<void>;
   handleSaveAnswer: (officeNumber: number, question: string, value: number, silentSuccess?: boolean) => Promise<void>;
   confirmCompletedUnit: (onSaved?: () => void) => Promise<boolean>;
@@ -119,10 +114,6 @@ interface AppContextType {
 const defaultGeneralData: UnitGeneralData = {
   clues: '',
   hasInternet: 'PENDIENTE',
-  hasTemporarilyClosedOffices: 'PENDIENTE',
-  enabledOffices: null,
-  unoperatedOffices: null,
-  totalGeneralOffices: null,
   configuredOffices: null,
   turns: {},
   updatedAt: new Date().toISOString()
@@ -392,12 +383,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       usuarioNombre: user?.name || '',
       usuarioEmail: user?.email || '',
       hasInternet: unit.hasInternet || 'PENDIENTE',
-      hasTemporarilyClosedOffices: 'PENDIENTE',
-      enabledOffices: unit.enabledOffices ?? null,
-      unoperatedOffices: unit.unoperatedOffices ?? null,
-      totalGeneralOffices: unit.enabledOffices === undefined
-        ? null
-        : unit.enabledOffices + (unit.unoperatedOffices ?? 0),
       configuredOffices: unit.totalOffices ?? null,
       turns: {},
       updatedAt: new Date().toISOString()
@@ -599,42 +584,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await addToSyncQueue({ action: 'save_general', clues: selectedUnit.clues, payload: updated });
       refreshPendingCount();
       addToast('Internet guardado localmente', 'warning', 'Se sincronizará al reconectar.');
-    }
-  }, [selectedUnit, selectedEntity, user, generalData, addToast, refreshPendingCount]);
-
-  const handleSetGeneralOfficeAvailability = useCallback(async (
-    status: 'SI' | 'NO',
-    enabledOffices: number | null,
-    unoperatedOffices: number | null
-  ) => {
-    if (!selectedUnit) return;
-    const safeEnabled = enabledOffices === null ? null : Math.max(0, Math.floor(enabledOffices));
-    const safeUnoperated = status === 'SI'
-      ? unoperatedOffices === null ? null : Math.max(0, Math.floor(unoperatedOffices))
-      : 0;
-    const totalGeneralOffices = safeEnabled === null || safeUnoperated === null
-      ? null
-      : safeEnabled + safeUnoperated;
-    const updated: UnitGeneralData = {
-      ...generalData,
-      entidad: selectedEntity || selectedUnit.entity || generalData.entidad,
-      usuarioNombre: user?.name || generalData.usuarioNombre || '',
-      usuarioEmail: user?.email || generalData.usuarioEmail || '',
-      hasTemporarilyClosedOffices: status,
-      enabledOffices: safeEnabled,
-      unoperatedOffices: safeUnoperated,
-      totalGeneralOffices,
-      updatedAt: new Date().toISOString()
-    };
-    setGeneralData(updated);
-    await saveLocalGeneralData(updated);
-    try {
-      await saveUnitGeneral(selectedUnit.clues, updated);
-      addToast('Disponibilidad de consultorios guardada', 'success');
-    } catch {
-      await addToSyncQueue({ action: 'save_general', clues: selectedUnit.clues, payload: updated });
-      refreshPendingCount();
-      addToast('Disponibilidad guardada localmente', 'warning', 'Se sincronizará al reconectar.');
     }
   }, [selectedUnit, selectedEntity, user, generalData, addToast, refreshPendingCount]);
 
@@ -945,7 +894,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         handleConfigureOffices,
         handleConfirmZeroOffices,
         handleSetInternet,
-        handleSetGeneralOfficeAvailability,
         handleSetTurn,
         handleSaveAnswer,
         confirmCompletedUnit,

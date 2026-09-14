@@ -9,9 +9,6 @@ create table if not exists public.respuestas (
   nombre_de_la_unidad text,
   categoria_gerencial_ampliada text,
   internet text check (internet in ('SI', 'NO', 'PENDIENTE')),
-  consultorios_habilitados integer check (consultorios_habilitados >= 0),
-  consultorios_inhabilitados integer check (consultorios_inhabilitados >= 0),
-  total_consultorios_medicina_general integer check (total_consultorios_medicina_general >= 0),
   consultorios integer check (consultorios >= 0),
   consultorio integer,
   pregunta text,
@@ -20,23 +17,17 @@ create table if not exists public.respuestas (
   habilitado boolean,
   causas_inhabilitacion text not null default '',
   medicos_generales integer check (medicos_generales is null or medicos_generales >= 0),
-  medico_disponible boolean,
-  horarios jsonb not null default '{}'::jsonb check (jsonb_typeof(horarios) = 'object')
+  medico_disponible boolean
 );
 
 alter table public.respuestas
-  add column if not exists consultorios_inhabilitados integer
-    check (consultorios_inhabilitados >= 0),
-  add column if not exists total_consultorios_medicina_general integer
-    check (total_consultorios_medicina_general >= 0),
   add column if not exists consultorios integer
     check (consultorios >= 0),
   add column if not exists habilitado boolean,
   add column if not exists causas_inhabilitacion text not null default '',
   add column if not exists medicos_generales integer
     check (medicos_generales is null or medicos_generales >= 0),
-  add column if not exists medico_disponible boolean,
-  add column if not exists horarios jsonb not null default '{}'::jsonb;
+  add column if not exists medico_disponible boolean;
 
 alter table public.respuestas
   drop constraint if exists respuestas_consultorios_check;
@@ -64,12 +55,6 @@ begin
   end if;
 end;
 $migration$;
-
-alter table public.respuestas
-  alter column horarios set default '{}'::jsonb,
-  drop constraint if exists respuestas_horarios_check,
-  add constraint respuestas_horarios_check
-    check (jsonb_typeof(horarios) = 'object');
 
 alter table public.respuestas
   drop constraint if exists respuestas_tipo_datos_check,
@@ -113,26 +98,17 @@ alter table public.respuestas
       and pregunta not like '¿Cuenta con médico general?%'
         and consultorios is null
         and internet is null
-        and consultorios_habilitados is null
-        and consultorios_inhabilitados is null
-        and total_consultorios_medicina_general is null
         and valor is not null
         and turno is null)
     or
     (tipo_registro = 'consultorio' and consultorio > 0
       and pregunta is null and valor is null and internet is null
-      and consultorios_habilitados is null
-      and consultorios is null
-      and consultorios_inhabilitados is null
-      and total_consultorios_medicina_general is null)
+      and consultorios is null)
     or
     (tipo_registro = 'horario' and consultorio > 0
       and pregunta is null and valor is null
       and turno ~ '^(Matutino|Vespertino) - .+$'
       and consultorios is null and internet is null
-      and consultorios_habilitados is null
-      and consultorios_inhabilitados is null
-      and total_consultorios_medicina_general is null
       and medicos_generales is null)
   );
 
