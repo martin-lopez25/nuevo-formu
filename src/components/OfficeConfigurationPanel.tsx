@@ -38,6 +38,11 @@ export const OfficeConfigurationPanel: React.FC<OfficeConfigurationPanelProps> =
   const [turnsToDelete, setTurnsToDelete] = useState<OperationalTurn[]>([]);
   const [disabledCauses, setDisabledCauses] = useState<string[]>([]);
   const [isSavingCauses, setIsSavingCauses] = useState(false);
+  const isDoctorCountSaved = doctorCount !== ''
+    && savedCount !== null
+    && savedCount !== undefined
+    && Number(doctorCount) === Number(savedCount)
+    && !isCountConfirmationPending;
   const causesConfirmed = answers[`${officeNumber}__${DISABLED_CAUSE_CONFIRMATION_QUESTION}`]?.value === 1;
   const savedDisabledCauses = DISABLED_OFFICE_CAUSES
     .filter((cause) => answers[`${officeNumber}__${cause.question}`]?.value === 1)
@@ -243,18 +248,26 @@ export const OfficeConfigurationPanel: React.FC<OfficeConfigurationPanelProps> =
                 saveDoctorCount();
               }
             }}
-            className="w-10 rounded-md border border-white/20 bg-[#002F2A] px-1 py-1 text-center text-[10px] font-bold text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+            className={`w-10 rounded-md border bg-[#002F2A] px-1 py-1 text-center text-[10px] font-bold focus:outline-none focus:ring-2 focus:ring-amber-400 ${
+              isDoctorCountSaved
+                ? 'border-amber-300 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.25)]'
+                : 'border-white/20 text-white'
+            }`}
           />
           <button
             type="button"
             onClick={saveDoctorCount}
-            disabled={doctorCount === ''}
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[8px] font-bold text-black disabled:cursor-not-allowed disabled:opacity-40 ${
-              isCountConfirmationPending ? 'bg-emerald-400' : 'bg-[#A57F2C] hover:bg-[#b88f33]'
+            disabled={doctorCount === '' || isDoctorCountSaved}
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[8px] font-bold text-black disabled:cursor-not-allowed ${
+              isDoctorCountSaved
+                ? 'border border-amber-200 bg-[#A57F2C]'
+                : isCountConfirmationPending
+                  ? 'bg-emerald-400'
+                  : 'bg-[#A57F2C] hover:bg-[#b88f33] disabled:opacity-40'
             }`}
           >
-            {isCountConfirmationPending ? <Check className="h-3 w-3" /> : <Save className="h-3 w-3" />}
-            {isCountConfirmationPending ? 'CONFIRMAR' : 'GUARDAR'}
+            {isDoctorCountSaved || isCountConfirmationPending ? <Check className="h-3 w-3" /> : <Save className="h-3 w-3" />}
+            {isDoctorCountSaved ? 'GUARDADO' : isCountConfirmationPending ? 'CONFIRMAR' : 'GUARDAR'}
           </button>
         </div>
       </div>}

@@ -102,7 +102,7 @@ export const Section2InstructionsVisuals: React.FC = () => {
             </div>
           </div>
 
-          {/* 7. Guardado Automático & 8. Ver Detalles */}
+          {/* 7. Guardado Automático & 9. Botiquín de ayuda */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-4 rounded-2xl bg-white/35 border border-black/15 backdrop-blur-sm shadow-sm">
               <h4 className="font-bold text-black text-xs mb-1.5 flex items-center gap-1.5">
@@ -116,10 +116,10 @@ export const Section2InstructionsVisuals: React.FC = () => {
             <div className="p-4 rounded-2xl bg-white/35 border border-black/15 backdrop-blur-sm shadow-sm">
               <h4 className="font-bold text-black text-xs mb-1.5 flex items-center gap-1.5">
                 <Info className="w-4 h-4 text-[#A57F2C]" />
-                9. Ver Detalles
+                9. Botiquín de ayuda
               </h4>
               <p className="text-xs text-black leading-relaxed">
-                Haga clic en &quot;Ver detalles&quot; para consultar los datos generales de la unidad y el avance. El porcentaje incluye la cantidad de médicos, la disponibilidad semanal y el catálogo de equipamiento; no incluye la respuesta sobre Internet.
+                El botiquín ubicado junto al logotipo contiene la ayuda para llenar el formulario. Haga clic en él para abrir las instrucciones y vuelva a hacer clic en el botiquín para cerrarlas.
               </p>
             </div>
           </div>

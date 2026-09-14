@@ -25,7 +25,7 @@ export const FillingInstructionsCabinet: React.FC = () => {
         aria-expanded={isOpen}
         aria-controls="filling-instructions"
         aria-label={isOpen ? 'Cerrar instrucciones de llenado' : 'Abrir instrucciones de llenado'}
-        title="Instrucciones de llenado"
+        title={isOpen ? 'Cerrar instrucciones de llenado' : 'Abrir instrucciones de llenado'}
       >
         <div className={`medical-cabinet ${isOpen ? 'is-open' : ''}`} aria-hidden="true">
           <div className="medical-cabinet-back">
@@ -38,7 +38,7 @@ export const FillingInstructionsCabinet: React.FC = () => {
           </div>
         </div>
         <span className="hidden max-w-20 text-left text-[9px] font-bold uppercase leading-tight text-white sm:block">
-          Dar click para instrucciones
+          {isOpen ? 'Dar click para cerrar instrucciones' : 'Dar click para instrucciones'}
         </span>
       </button>
 
@@ -56,9 +56,8 @@ export const FillingInstructionsCabinet: React.FC = () => {
             <header className="sticky top-0 z-10 border-b border-white/20 bg-[#1E5B4F]/80 text-white shadow-md backdrop-blur-xl">
               <div className="px-4 py-4 sm:px-8">
               <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-widest text-amber-300">Apoyo para la captura</p>
+                <p className="text-[10px] font-extrabold uppercase tracking-widest text-amber-300">Botiquín de ayuda para llenar el formulario</p>
                 <h2 id="filling-instructions-title" className="text-xl font-extrabold sm:text-2xl">Instrucciones de llenado</h2>
-                <p className="mt-1 text-xs text-white/85 sm:text-sm">Para salir de las instrucciones, haga clic nuevamente en el botiquín.</p>
               </div>
             </div>
           </header>
