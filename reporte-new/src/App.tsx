@@ -235,7 +235,7 @@ export default function App() {
       unidadesInternet: cluesConInternet.size,
       consultoriosTotales: resumen.reduce((s, r) => s + toNumber(r.consultorio), 0),
       pctLlenado: (() => {
-        const FIXED = new Set(['entidad', 'clues_imb', 'nombre_de_la_unidad', 'internet', 'consultorios', 'consultorio', 'turno_consultorio', 'habilitado', 'causas_inhabilitacion', 'medicos_generales', 'latitud', 'longitud']);
+        const FIXED = new Set(['entidad', 'clues_imb', 'nombre_de_la_unidad', 'internet', 'consultorios', 'consultorio', 'turno_consultorio', 'turno', 'habilitado', 'causas_inhabilitacion', 'medicos_generales', 'latitud', 'longitud']);
         let filled = 0, total = 0;
         for (const row of resultado) {
           for (const [key, value] of Object.entries(row)) {
@@ -261,6 +261,7 @@ export default function App() {
       'medicos_generales',
       'consultorio',
       'turno_consultorio',
+      'turno',
       'latitud',
       'longitud',
     ]);

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { MexicanEntity, MedicalUnit, QuestionAnswer, EquipmentItem, SyncQueueItem, UnitGeneralData } from '../types.ts';
+import { EQUIPMENT_CATALOG, getEquipmentColumn, getEquipmentId } from '../data/equipmentCatalog.ts';
 import {
   DISABLED_CAUSE_CONFIRMATION_QUESTION,
   DISABLED_OFFICE_CAUSES,
@@ -10,6 +11,8 @@ import {
   OFFICE_ENABLED_QUESTION,
   parseDoctorAvailabilityQuestion,
   parseOfficeScheduleQuestion,
+  parseStoredSchedule,
+  WEEK_DAYS,
   type OperationalTurn
 } from '../data/officeConfiguration.ts';
 
@@ -39,22 +42,6 @@ function parseStoredCauses(value: unknown): string[] {
   return value.split(',').map((cause) => cause.trim()).filter(Boolean);
 }
 
-function answerRow(payload: Parameters<typeof saveSingleAnswer>[0]) {
-  return {
-    fecha_registro: new Date().toISOString(),
-    tipo_registro: 'respuesta',
-    entidad: payload.entidad,
-    usuario_nombre: payload.usuarioNombre,
-    usuario_email: payload.usuarioEmail,
-    clues_imb: payload.clues.trim().toUpperCase(),
-    nombre_de_la_unidad: payload.nombreUnidad,
-    consultorio: payload.numeroConsultorio,
-    pregunta: payload.pregunta.trim(),
-    valor: payload.valor,
-    turno: null
-  };
-}
-
 async function saveAnswerRow(payload: Parameters<typeof saveSingleAnswer>[0]) {
   const client = requireSupabase();
   const normalizedClues = payload.clues.trim().toUpperCase();
@@ -66,35 +53,18 @@ async function saveAnswerRow(payload: Parameters<typeof saveSingleAnswer>[0]) {
     const slot = schedule || doctorAvailability!;
     const turnAndDay = `${slot.turn} - ${slot.day}`;
     const timestamp = new Date().toISOString();
-    const existing = await client.from('respuestas').select('*')
-      .eq('clues_imb', normalizedClues)
-      .eq('tipo_registro', 'horario')
-      .eq('consultorio', payload.numeroConsultorio)
-      .eq('turno', turnAndDay)
-      .maybeSingle();
-    if (existing.error) throw existing.error;
-
-    const row = {
-      fecha_registro: timestamp,
-      tipo_registro: 'horario',
-      entidad: payload.entidad,
-      usuario_nombre: payload.usuarioNombre,
-      usuario_email: payload.usuarioEmail,
-      clues_imb: normalizedClues,
-      nombre_de_la_unidad: payload.nombreUnidad,
-      consultorio: payload.numeroConsultorio,
-      pregunta: null,
-      valor: null,
-      turno: turnAndDay,
-      habilitado: schedule ? payload.valor === 1 : existing.data?.habilitado ?? false,
-      causas_inhabilitacion: '',
-      medicos_generales: null,
-      medico_disponible: doctorAvailability ? payload.valor === 1 : existing.data?.medico_disponible ?? false
-    };
-    const result = existing.data
-      ? await client.from('respuestas').update(row).eq('id', existing.data.id)
-      : await client.from('respuestas').insert(row);
-    if (result.error) throw result.error;
+    const { error } = await client.rpc('guardar_horario_consultorio', {
+      p_clues: normalizedClues,
+      p_consultorio: payload.numeroConsultorio,
+      p_slot: turnAndDay,
+      p_campo: schedule ? 'habilitado' : 'medico_disponible',
+      p_valor: payload.valor === 1,
+      p_entidad: payload.entidad,
+      p_usuario_nombre: payload.usuarioNombre,
+      p_usuario_email: payload.usuarioEmail,
+      p_nombre_unidad: payload.nombreUnidad
+    });
+    if (error) throw error;
     return timestamp;
   }
 
@@ -131,9 +101,8 @@ async function saveAnswerRow(payload: Parameters<typeof saveSingleAnswer>[0]) {
       clues_imb: normalizedClues,
       nombre_de_la_unidad: payload.nombreUnidad,
       consultorio: payload.numeroConsultorio,
-      pregunta: null,
-      valor: null,
-      turno: enabled === false ? null : existing.data?.turno || payload.turno || null,
+      turno: enabled === false ? null : existing.data?.turno || null,
+      turno_consultorio: enabled === false ? null : existing.data?.turno_consultorio || payload.turno || null,
       habilitado: enabled,
       causas_inhabilitacion: enabled === true ? '' : [...selectedCauses].join(', '),
       medicos_generales: enabled === false
@@ -154,23 +123,21 @@ async function saveAnswerRow(payload: Parameters<typeof saveSingleAnswer>[0]) {
     return timestamp;
   }
 
-  const row = answerRow(payload);
-  const query = client
-    .from('respuestas')
-    .select('id')
-    .eq('clues_imb', row.clues_imb)
-    .eq('tipo_registro', 'respuesta')
-    .eq('consultorio', row.consultorio)
-    .eq('pregunta', row.pregunta)
-    .maybeSingle();
-  const existing = await query;
-  if (existing.error) throw existing.error;
-
-  const result = existing.data
-    ? await client.from('respuestas').update(row).eq('id', existing.data.id)
-    : await client.from('respuestas').insert(row);
-  if (result.error) throw result.error;
-  return row.fecha_registro;
+  const questionId = getEquipmentId(payload.pregunta.trim());
+  if (!questionId) throw new Error(`La pregunta no existe en el catálogo: ${payload.pregunta}`);
+  const timestamp = new Date().toISOString();
+  const { error } = await client.rpc('guardar_respuesta_consultorio', {
+    p_clues: normalizedClues,
+    p_consultorio: payload.numeroConsultorio,
+    p_pregunta_id: questionId,
+    p_valor: payload.valor,
+    p_entidad: payload.entidad,
+    p_usuario_nombre: payload.usuarioNombre,
+    p_usuario_email: payload.usuarioEmail,
+    p_nombre_unidad: payload.nombreUnidad
+  });
+  if (error) throw error;
+  return timestamp;
 }
 
 export interface ApiResponse<T = any> {
@@ -185,7 +152,7 @@ export interface ApiResponse<T = any> {
 export interface AdminResponseRow {
   id: number;
   fecha_registro: string;
-  tipo_registro: 'unidad' | 'respuesta' | 'consultorio' | 'horario';
+  tipo_registro: 'unidad' | 'consultorio';
   entidad: string | null;
   usuario_nombre: string | null;
   usuario_email: string | null;
@@ -197,10 +164,12 @@ export interface AdminResponseRow {
   pregunta: string | null;
   valor: number | null;
   turno: string | null;
+  turno_consultorio: string | null;
   habilitado: boolean | null;
   causas_inhabilitacion: string | null;
   medicos_generales: number | null;
-  medico_disponible: boolean | null;
+  catalogo_version: number | null;
+  [column: string]: unknown;
 }
 
 async function adminPassword(value: string) {
@@ -369,11 +338,11 @@ export async function fetchUnitResponses(clues: string): Promise<{ answers: Reco
           question: OFFICE_ENABLED_QUESTION,
           value: office.habilitado ? 1 : 0,
           status: 'saved_cloud',
-          turn: office.turno || '',
+          turn: office.turno_consultorio || '',
           updatedAt
         };
       }
-      if (office.turno) turns[officeNumber] = office.turno;
+      if (office.turno_consultorio) turns[officeNumber] = office.turno_consultorio;
       if (office.medicos_generales !== null) {
         answers[`${officeNumber}__${GENERAL_DOCTOR_COUNT_QUESTION}`] = {
           clues: normalizedClues,
@@ -381,7 +350,7 @@ export async function fetchUnitResponses(clues: string): Promise<{ answers: Reco
           question: GENERAL_DOCTOR_COUNT_QUESTION,
           value: Number(office.medicos_generales),
           status: 'saved_cloud',
-          turn: office.turno || '',
+          turn: office.turno_consultorio || '',
           updatedAt
         };
       }
@@ -394,7 +363,7 @@ export async function fetchUnitResponses(clues: string): Promise<{ answers: Reco
           question: cause.question,
           value: 1,
           status: 'saved_cloud',
-          turn: office.turno || '',
+          turn: office.turno_consultorio || '',
           updatedAt
         };
       });
@@ -405,48 +374,49 @@ export async function fetchUnitResponses(clues: string): Promise<{ answers: Reco
           question: DISABLED_CAUSE_CONFIRMATION_QUESTION,
           value: 1,
           status: 'saved_cloud',
-          turn: office.turno || '',
+          turn: office.turno_consultorio || '',
           updatedAt
         };
       }
     });
 
-    rows.filter((row) => row.tipo_registro === 'horario' && row.habilitado).forEach((scheduleRow) => {
-      const officeNumber = Number(scheduleRow.consultorio);
-      const match = String(scheduleRow.turno || '').match(/^(Matutino|Vespertino) - (.+)$/);
-      if (!match) return;
-      const operationalTurn = match[1] as OperationalTurn;
-      const day = match[2];
-      const updatedAt = scheduleRow.fecha_registro || new Date().toISOString();
-      const scheduleQuestion = getOfficeScheduleQuestion(operationalTurn, day);
-      const doctorQuestion = getDoctorAvailabilityQuestion(operationalTurn, day);
-      answers[`${officeNumber}__${scheduleQuestion}`] = {
-        clues: normalizedClues, officeNumber, question: scheduleQuestion, value: 1,
-        status: 'saved_cloud', turn: operationalTurn, updatedAt
-      };
-      answers[`${officeNumber}__${doctorQuestion}`] = {
-        clues: normalizedClues, officeNumber, question: doctorQuestion,
-        value: scheduleRow.medico_disponible ? 1 : 0,
-        status: 'saved_cloud', turn: operationalTurn, updatedAt
-      };
-    });
-
-    rows
-      .filter((row) => row.tipo_registro === 'respuesta' && row.pregunta !== 'consultorios' && row.valor !== null)
-      .forEach((row) => {
-        const officeNumber = Number(row.consultorio);
-        const question = normalizeQuestionName(String(row.pregunta));
+    rows.filter((row) => row.tipo_registro === 'consultorio').forEach((office) => {
+      const officeNumber = Number(office.consultorio);
+      const updatedAt = office.fecha_registro || new Date().toISOString();
+      const storedSchedule = parseStoredSchedule(office.turno);
+      (['Matutino', 'Vespertino'] as OperationalTurn[]).forEach((operationalTurn) => {
+        WEEK_DAYS.forEach(({ key: day }) => {
+        const scheduleKey = `${operationalTurn.toLowerCase()}-${day}`;
+        if (!storedSchedule.has(scheduleKey)) return;
+        const scheduleQuestion = getOfficeScheduleQuestion(operationalTurn, day);
+        const doctorQuestion = getDoctorAvailabilityQuestion(operationalTurn, day);
+        answers[`${officeNumber}__${scheduleQuestion}`] = {
+          clues: normalizedClues, officeNumber, question: scheduleQuestion, value: 1,
+          status: 'saved_cloud', turn: operationalTurn, updatedAt
+        };
+        answers[`${officeNumber}__${doctorQuestion}`] = {
+          clues: normalizedClues, officeNumber, question: doctorQuestion,
+          value: storedSchedule.get(scheduleKey) ? 1 : 0,
+          status: 'saved_cloud', turn: operationalTurn, updatedAt
+        };
+        });
+      });
+      EQUIPMENT_CATALOG.forEach((item) => {
+        const storedValue = office[getEquipmentColumn(item.id)];
+        if (storedValue === null || storedValue === undefined) return;
+        const question = normalizeQuestionName(item.name);
         answers[`${officeNumber}__${question}`] = {
           clues: normalizedClues,
           officeNumber,
           question,
-          value: row.valor === null ? null : Number(row.valor),
+          value: Number(storedValue),
           status: 'saved_cloud',
           turn: '',
-          updatedAt: row.fecha_registro || new Date().toISOString(),
-          version: 1
+          updatedAt,
+          version: Number(office.catalogo_version || 1)
         };
       });
+    });
 
     const general = config ? {
       clues: normalizedClues,
@@ -562,8 +532,6 @@ export async function saveUnitGeneral(clues: string, generalData: UnitGeneralDat
       internet: generalData.hasInternet,
       consultorios: generalData.configuredOffices,
       consultorio: null,
-      pregunta: null,
-      valor: null,
       turno: null
     };
     const existingConfig = await client.from('respuestas').select('id').eq('clues_imb', normalizedClues).eq('tipo_registro', 'unidad').maybeSingle();
@@ -591,9 +559,8 @@ export async function saveUnitGeneral(clues: string, generalData: UnitGeneralDat
         clues_imb: normalizedClues,
         nombre_de_la_unidad: generalData.nombreUnidad || existingOffice.data?.nombre_de_la_unidad || '',
         consultorio: numericOffice,
-        pregunta: null,
-        valor: null,
-        turno: turn,
+        turno: existingOffice.data?.turno || null,
+        turno_consultorio: turn,
         habilitado: existingOffice.data?.habilitado ?? null,
         causas_inhabilitacion: typeof existingOffice.data?.causas_inhabilitacion === 'string'
           ? existingOffice.data.causas_inhabilitacion

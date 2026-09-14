@@ -18,3 +18,7 @@ View your app in AI Studio: https://ai.studio/apps/4eb0c6df-7c6d-439b-931a-8b964
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## Supabase data model
+
+`public.respuestas` stores one `unidad` row per CLUES and one `consultorio` row per office. Equipment quantities use the 65 physical columns `p_1` through `p_65`; each suffix is the stable ID from `src/data/questions.json`. `turno_consultorio` stores `Matutino`, `Vespertino`, or `Ambos`; `turno` stores the weekly schedule as comma-separated values such as `matutino-lunes-med, vespertino-jueves`, where `-med` indicates doctor availability.

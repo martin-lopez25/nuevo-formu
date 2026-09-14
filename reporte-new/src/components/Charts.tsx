@@ -42,6 +42,7 @@ const FIXED_COLUMNS = new Set([
   'medicos_generales',
   'consultorio',
   'turno_consultorio',
+  'turno',
   'latitud',
   'longitud',
 ]);

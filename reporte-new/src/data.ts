@@ -23,10 +23,12 @@ interface SupabaseRow {
   pregunta: string | null;
   valor: number | null;
   turno: string | null;
+  turno_consultorio: string | null;
   habilitado: boolean | null;
   causas_inhabilitacion: string | null;
   medicos_generales: number | null;
-  medico_disponible: boolean | null;
+  catalogo_version: number | null;
+  [column: string]: unknown;
 }
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -80,7 +82,7 @@ async function fetchLiveAdvanceTables(): Promise<{
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
       .from('respuestas')
-      .select('fecha_registro,tipo_registro,entidad,usuario_nombre,usuario_email,clues_imb,nombre_de_la_unidad,internet,consultorios,consultorio,pregunta,valor,turno,habilitado,causas_inhabilitacion,medicos_generales,medico_disponible')
+      .select('*')
       .range(from, from + pageSize - 1);
 
     if (error) throw new Error(`No fue posible consultar las respuestas de Supabase: ${error.message}`);
@@ -98,19 +100,8 @@ async function fetchLiveAdvanceTables(): Promise<{
   }>();
   const responseRows: SupabaseRow[] = [];
 
-  for (const row of rows) {
+  const registerResponse = (row: SupabaseRow) => {
     const clues = normalize(row.clues_imb);
-    if (!clues || !expectedByClues.has(clues)) continue;
-    if (row.tipo_registro === 'unidad') {
-      configByClues.set(clues, row);
-      continue;
-    }
-    if (row.tipo_registro === 'consultorio' && row.consultorio !== null) {
-      officeByKey.set(`${clues}::${row.consultorio}`, row);
-      continue;
-    }
-    if (row.tipo_registro !== 'respuesta') continue;
-
     responseRows.push(row);
     const current = responsesByClues.get(clues) ?? {
       responded: 0,
@@ -124,6 +115,26 @@ async function fetchLiveAdvanceTables(): Promise<{
       current.maxOffice = current.maxOffice === null ? office : Math.max(current.maxOffice, office);
     }
     responsesByClues.set(clues, current);
+  };
+
+  for (const row of rows) {
+    const clues = normalize(row.clues_imb);
+    if (!clues || !expectedByClues.has(clues)) continue;
+    if (row.tipo_registro === 'unidad') {
+      configByClues.set(clues, row);
+      continue;
+    }
+    if (row.tipo_registro === 'consultorio' && row.consultorio !== null) {
+      officeByKey.set(`${clues}::${row.consultorio}`, row);
+      for (const question of questions) {
+        const value = row[`p_${question.id}`];
+        if (value === null || value === undefined) continue;
+        registerResponse({ ...row, pregunta: question.name, valor: Number(value) });
+      }
+      continue;
+    }
+    if (row.tipo_registro !== 'respuesta') continue;
+    registerResponse(row);
   }
 
   const questionColumns = questions.map((question) => `${questionKey(question.name)}_consultorio`);
@@ -145,7 +156,8 @@ async function fetchLiveAdvanceTables(): Promise<{
       internet: config?.internet ?? null,
       consultorios: config?.consultorios ?? null,
       consultorio: office,
-      turno_consultorio: officeConfig?.turno ?? row.turno ?? null,
+      turno_consultorio: officeConfig?.turno_consultorio ?? null,
+      turno: officeConfig?.turno ?? null,
       habilitado: officeConfig?.habilitado ?? null,
       causas_inhabilitacion: officeConfig?.causas_inhabilitacion ?? null,
       medicos_generales: officeConfig?.medicos_generales ?? null,
@@ -169,7 +181,7 @@ async function fetchLiveAdvanceTables(): Promise<{
     const column = questionColumnByName.get(normalize(row.pregunta))
       ?? `${questionKey(row.pregunta)}_consultorio`;
     result[column] = row.valor;
-    if (row.turno) result.turno_consultorio = row.turno;
+    if (row.turno_consultorio) result.turno_consultorio = row.turno_consultorio;
   }
 
   const resultado = [...resultByOffice.values()].map((row) => {
@@ -199,6 +211,7 @@ async function fetchLiveAdvanceTables(): Promise<{
     'habilitado',
     'causas_inhabilitacion',
     'medicos_generales',
+    'turno',
   ]);
   const resumenEntidadMap = new Map<string, DataRow>();
   for (const row of resultado) {

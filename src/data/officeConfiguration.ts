@@ -37,6 +37,16 @@ export function getOfficeScheduleQuestion(turn: OperationalTurn, day: string) {
   return `¿Opera en este horario? ${turn} - ${day}`;
 }
 
+export function parseStoredSchedule(value: unknown) {
+  const slots = new Map<string, boolean>();
+  if (typeof value !== 'string') return slots;
+  value.split(',').map((slot) => slot.trim().toLowerCase()).filter(Boolean).forEach((slot) => {
+    const match = slot.match(/^(matutino|vespertino)-(lunes|martes|miercoles|jueves|viernes|sabado|domingo)(-med)?$/);
+    if (match) slots.set(`${match[1]}-${match[2]}`, Boolean(match[3]));
+  });
+  return slots;
+}
+
 export function isDoctorAvailabilityQuestion(question: string) {
   return question.startsWith('¿Cuenta con médico general? ');
 }

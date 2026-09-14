@@ -235,7 +235,7 @@ export const FillingInstructionsCabinet: React.FC = () => {
               <div className="mt-4 flex items-start gap-3 rounded-md border-2 border-amber-500 bg-amber-100 px-4 py-3 text-amber-950 shadow-sm" role="note">
                 <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
                 <p className="text-sm font-bold leading-6">
-                  Importante: debe hacer doble clic en el botón, o bien un clic en <strong>GUARDAR</strong> y después otro clic en <strong>CONFIRMAR</strong>. Si no realiza el segundo clic, la cantidad no se guarda.
+                  Importante: puede capturar de 0 a 9999. Presione <strong>GUARDAR</strong> y después <strong>CONFIRMAR</strong>. Para cantidades de 3 o 4 dígitos, antes deberá responder <strong>SÍ</strong> a la advertencia de cantidad. Si no realiza la confirmación final, la cantidad no se guarda.
                 </p>
               </div>
             </section>

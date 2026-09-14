@@ -115,7 +115,7 @@ export const Section2Instructions: React.FC = () => {
                 <br />• <strong>Habilitación:</strong> Indique si el consultorio está habilitado. Si selecciona NO, elija y guarde una o más causas: Infraestructura, Equipamiento o Recursos Humanos. Los demás campos del consultorio quedarán bloqueados.
                 <br />• <strong>Turno:</strong> Seleccione Matutino, Vespertino o Ambos.
                 <br />• <strong>Horario y médicos generales:</strong> Capture la cantidad total de médicos una sola vez. En cada día, marque primero la casilla cuadrada para asignar horario; después use el círculo para indicar si cuenta con médico general. Sin horario, el botón de médico permanece deshabilitado. Si selecciona Ambos, complete una fila por cada turno.
-                <br />• <strong>Cantidad:</strong> Haga clic en la celda, capture un número entero igual o mayor que 0, presione Guardar y después Confirmar. También puede presionar Enter dos veces. Cuente únicamente bienes en condiciones óptimas de funcionamiento.
+                <br />• <strong>Cantidad:</strong> Haga clic en la celda y capture un número entero de 0 a 9999. Presione Guardar y después Confirmar. Para cantidades de 3 o 4 dígitos, primero deberá confirmar que está seguro de contar con esa cantidad. Cuente únicamente bienes en condiciones óptimas de funcionamiento.
               </p>
             </div>
           </div>

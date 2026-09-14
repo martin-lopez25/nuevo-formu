@@ -29,6 +29,7 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
   );
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [isSaveConfirmationPending, setIsSaveConfirmationPending] = useState(false);
+  const [isHighValueConfirmationPending, setIsHighValueConfirmationPending] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -40,6 +41,7 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
       );
       setErrorMsg('');
       setIsSaveConfirmationPending(false);
+      setIsHighValueConfirmationPending(false);
       setTimeout(() => {
         inputRef.current?.focus();
         inputRef.current?.select();
@@ -56,6 +58,7 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
     setEditingCell(null);
     setErrorMsg('');
     setIsSaveConfirmationPending(false);
+    setIsHighValueConfirmationPending(false);
   };
 
   const handleSave = async () => {
@@ -70,11 +73,27 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
     if (isNaN(num) || !Number.isInteger(num) || num < 0) {
       setErrorMsg('Solo enteros ≥ 0');
       setIsSaveConfirmationPending(false);
+      setIsHighValueConfirmationPending(false);
+      return;
+    }
+
+    if (num > 9999) {
+      setErrorMsg('Máximo 4 dígitos (9999)');
+      setIsSaveConfirmationPending(false);
+      setIsHighValueConfirmationPending(false);
       return;
     }
 
     if (!isSaveConfirmationPending) {
+      if (num > 99) {
+        if (!isHighValueConfirmationPending) {
+          setIsHighValueConfirmationPending(true);
+          setErrorMsg('');
+        }
+        return;
+      }
       setIsSaveConfirmationPending(true);
+      setIsHighValueConfirmationPending(false);
       setErrorMsg('Presione Confirmar para guardar');
       return;
     }
@@ -130,12 +149,14 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
+              maxLength={4}
               value={inputValue}
               onChange={(event) => {
-                if (event.target.value === '' || /^\d+$/.test(event.target.value)) {
+                if (event.target.value === '' || /^\d{1,4}$/.test(event.target.value)) {
                   setInputValue(event.target.value);
                   setErrorMsg('');
                   setIsSaveConfirmationPending(false);
+                  setIsHighValueConfirmationPending(false);
                 }
               }}
               onKeyDown={(event) => {
@@ -173,6 +194,34 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
             </button>
           </div>
           <p className="mt-0.5 text-[9px] leading-tight text-zinc-300">Capture únicamente bienes en condiciones óptimas de funcionamiento.</p>
+          {isHighValueConfirmationPending && (
+            <div role="alert" className="mt-2 rounded-md border border-amber-400 bg-amber-950 p-2 text-left text-[10px] text-amber-100">
+              <p className="flex items-start gap-1 font-bold">
+                <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+                ¿Está seguro de que cuenta con esta cantidad?
+              </p>
+              <div className="mt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsHighValueConfirmationPending(false)}
+                  className="rounded border border-white/25 px-2 py-1 font-bold text-white hover:bg-white/10"
+                >
+                  NO
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsHighValueConfirmationPending(false);
+                    setIsSaveConfirmationPending(true);
+                    setErrorMsg('Presione Confirmar para guardar');
+                  }}
+                  className="rounded bg-amber-400 px-2 py-1 font-extrabold text-black hover:bg-amber-300"
+                >
+                  SÍ
+                </button>
+              </div>
+            </div>
+          )}
           {errorMsg && (
             <div className={`absolute -bottom-6 left-0 right-0 text-[10px] px-1 py-0.5 rounded border z-30 ${
               isSaveConfirmationPending

@@ -6,6 +6,21 @@ import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes, timingSafeEqual } from 'crypto';
+import { EQUIPMENT_CATALOG, getEquipmentColumn, getEquipmentId } from './src/data/equipmentCatalog.ts';
+import {
+  DISABLED_CAUSE_CONFIRMATION_QUESTION,
+  DISABLED_OFFICE_CAUSES,
+  GENERAL_DOCTOR_COUNT_QUESTION,
+  getDisabledCauseFromQuestion,
+  getDoctorAvailabilityQuestion,
+  getOfficeScheduleQuestion,
+  OFFICE_ENABLED_QUESTION,
+  parseDoctorAvailabilityQuestion,
+  parseOfficeScheduleQuestion,
+  parseStoredSchedule,
+  WEEK_DAYS,
+  type OperationalTurn
+} from './src/data/officeConfiguration.ts';
 
 dotenv.config();
 
@@ -113,9 +128,9 @@ function answerToDatabase(answer: StoredAnswer) {
   };
 }
 
-function answerFromDatabase(row: any): StoredAnswer {
+function storedAnswer(row: any, question: string, value: number, turn = ''): StoredAnswer {
   return {
-    id: `${row.clues_imb}_${row.consultorio}_${row.pregunta}`,
+    id: `${row.clues_imb}_${row.consultorio}_${question}`,
     entidad: row.entidad || '',
     usuarioNombre: row.usuario_nombre || '',
     usuarioEmail: row.usuario_email || '',
@@ -124,13 +139,119 @@ function answerFromDatabase(row: any): StoredAnswer {
     categoria: row.categoria_gerencial_ampliada || 'Sin categoría',
     numeroConsultorios: 0,
     numeroConsultorio: Number(row.consultorio),
-    pregunta: row.pregunta,
-    valor: row.valor === null ? null : Number(row.valor),
-    turno: row.turno || '',
+    pregunta: question,
+    valor: value,
+    turno: turn || row.turno_consultorio || '',
     tipoRegistro: 'respuesta',
     fechaActualizacion: row.fecha_registro,
     version: 1
   };
+}
+
+function answersFromOffice(row: any): StoredAnswer[] {
+  const answers: StoredAnswer[] = [];
+  if (row.habilitado !== null && row.habilitado !== undefined) {
+    answers.push(storedAnswer(row, OFFICE_ENABLED_QUESTION, row.habilitado ? 1 : 0));
+  }
+  if (row.medicos_generales !== null && row.medicos_generales !== undefined) {
+    answers.push(storedAnswer(row, GENERAL_DOCTOR_COUNT_QUESTION, Number(row.medicos_generales)));
+  }
+  const causes = new Set(String(row.causas_inhabilitacion || '').split(',').map((value) => value.trim()).filter(Boolean));
+  for (const cause of DISABLED_OFFICE_CAUSES) {
+    if (causes.has(cause.label)) answers.push(storedAnswer(row, cause.question, 1));
+  }
+  if (causes.size > 0) answers.push(storedAnswer(row, DISABLED_CAUSE_CONFIRMATION_QUESTION, 1));
+
+  const storedSchedule = parseStoredSchedule(row.turno);
+  for (const operationalTurn of ['Matutino', 'Vespertino'] as OperationalTurn[]) {
+    for (const { key: day } of WEEK_DAYS) {
+      const scheduleKey = `${operationalTurn.toLowerCase()}-${day}`;
+      if (!storedSchedule.has(scheduleKey)) continue;
+      answers.push(storedAnswer(row, getOfficeScheduleQuestion(operationalTurn, day), 1, operationalTurn));
+      answers.push(storedAnswer(row, getDoctorAvailabilityQuestion(operationalTurn, day), storedSchedule.get(scheduleKey) ? 1 : 0, operationalTurn));
+    }
+  }
+
+  for (const item of EQUIPMENT_CATALOG) {
+    const value = row[getEquipmentColumn(item.id)];
+    if (value !== null && value !== undefined) answers.push(storedAnswer(row, item.name, Number(value)));
+  }
+  return answers;
+}
+
+async function persistStoredAnswer(sb: any, answer: StoredAnswer) {
+  const schedule = parseOfficeScheduleQuestion(answer.pregunta);
+  const doctorAvailability = parseDoctorAvailabilityQuestion(answer.pregunta);
+  if (schedule || doctorAvailability) {
+    const slot = schedule || doctorAvailability!;
+    const { error } = await sb.rpc('guardar_horario_consultorio', {
+      p_clues: answer.clues,
+      p_consultorio: answer.numeroConsultorio,
+      p_slot: `${slot.turn} - ${slot.day}`,
+      p_campo: schedule ? 'habilitado' : 'medico_disponible',
+      p_valor: answer.valor === 1,
+      p_entidad: answer.entidad,
+      p_usuario_nombre: answer.usuarioNombre,
+      p_usuario_email: answer.usuarioEmail,
+      p_nombre_unidad: answer.nombreUnidad
+    });
+    if (error) throw error;
+    return;
+  }
+
+  const cause = getDisabledCauseFromQuestion(answer.pregunta);
+  const isOfficeConfiguration = answer.pregunta === OFFICE_ENABLED_QUESTION
+    || answer.pregunta === GENERAL_DOCTOR_COUNT_QUESTION
+    || answer.pregunta === DISABLED_CAUSE_CONFIRMATION_QUESTION
+    || Boolean(cause);
+  if (isOfficeConfiguration) {
+    if (answer.pregunta === DISABLED_CAUSE_CONFIRMATION_QUESTION) return;
+    const existing = await sb.from('respuestas').select('*')
+      .eq('clues_imb', answer.clues).eq('tipo_registro', 'consultorio')
+      .eq('consultorio', answer.numeroConsultorio).maybeSingle();
+    if (existing.error) throw existing.error;
+    const selectedCauses = new Set(String(existing.data?.causas_inhabilitacion || '').split(',').map((value) => value.trim()).filter(Boolean));
+    if (cause) answer.valor === 1 ? selectedCauses.add(cause.label) : selectedCauses.delete(cause.label);
+    const enabled = answer.pregunta === OFFICE_ENABLED_QUESTION ? answer.valor === 1 : existing.data?.habilitado ?? null;
+    const row = {
+      fecha_registro: answer.fechaActualizacion,
+      tipo_registro: 'consultorio',
+      entidad: answer.entidad,
+      usuario_nombre: answer.usuarioNombre,
+      usuario_email: answer.usuarioEmail,
+      clues_imb: answer.clues,
+      nombre_de_la_unidad: answer.nombreUnidad,
+      consultorio: answer.numeroConsultorio,
+      turno: enabled === false ? null : existing.data?.turno || null,
+      turno_consultorio: enabled === false ? null : existing.data?.turno_consultorio || answer.turno || null,
+      habilitado: enabled,
+      causas_inhabilitacion: enabled === true ? '' : [...selectedCauses].join(', '),
+      medicos_generales: enabled === false ? null : answer.pregunta === GENERAL_DOCTOR_COUNT_QUESTION ? answer.valor : existing.data?.medicos_generales ?? null
+    };
+    const result = existing.data
+      ? await sb.from('respuestas').update(row).eq('id', existing.data.id)
+      : await sb.from('respuestas').insert(row);
+    if (result.error) throw result.error;
+    if (answer.pregunta === OFFICE_ENABLED_QUESTION && !enabled) {
+      const cleared = await sb.rpc('eliminar_datos_consultorio_deshabilitado', { p_clues: answer.clues, p_consultorio: answer.numeroConsultorio });
+      if (cleared.error) throw cleared.error;
+    }
+    return;
+  }
+
+  const questionId = getEquipmentId(answer.pregunta);
+  if (!questionId) throw new Error(`La pregunta no existe en el catálogo: ${answer.pregunta}`);
+  const { error } = await sb.rpc('guardar_respuesta_consultorio', {
+    p_clues: answer.clues,
+    p_consultorio: answer.numeroConsultorio,
+    p_pregunta_id: questionId,
+    p_valor: answer.valor,
+    p_entidad: answer.entidad,
+    p_usuario_nombre: answer.usuarioNombre,
+    p_usuario_email: answer.usuarioEmail,
+    p_nombre_unidad: answer.nombreUnidad
+  });
+  if (error) throw error;
 }
 
 function configToDatabase(config: StoredUnitConfig) {
@@ -173,14 +294,22 @@ async function updateOfficeTurns(config: StoredUnitConfig, sb: ReturnType<typeof
     }
 
     if (sb) {
-      const { error } = await sb
-        .from('respuestas')
-        .update({ turno: turn, fecha_registro: config.updatedAt })
-        .eq('clues_imb', config.clues)
-        .eq('tipo_registro', 'respuesta')
-        .eq('consultorio', officeNumber)
-        .neq('pregunta', 'consultorios');
-      if (error) throw error;
+      const existing = await sb.from('respuestas').select('id')
+        .eq('clues_imb', config.clues).eq('tipo_registro', 'consultorio')
+        .eq('consultorio', officeNumber).maybeSingle();
+      if (existing.error) throw existing.error;
+      const result = existing.data
+        ? await sb.from('respuestas').update({ turno_consultorio: turn, fecha_registro: config.updatedAt }).eq('id', existing.data.id)
+        : await sb.from('respuestas').insert({
+            fecha_registro: config.updatedAt,
+            tipo_registro: 'consultorio',
+            entidad: config.entidad,
+            usuario_nombre: config.usuarioNombre,
+            clues_imb: config.clues,
+            consultorio: officeNumber,
+            turno_consultorio: turn
+          });
+      if (result.error) throw result.error;
     }
   }
 }
@@ -323,19 +452,19 @@ app.get('/api/unidades/:clues/respuestas/', async (req, res) => {
 
     if (sb) {
       const [answersResult, configResult] = await Promise.all([
-        sb.from('respuestas').select('*').eq('clues_imb', clues).eq('tipo_registro', 'respuesta').neq('pregunta', 'consultorios'),
+        sb.from('respuestas').select('*').eq('clues_imb', clues).eq('tipo_registro', 'consultorio'),
         sb.from('respuestas').select('*').eq('clues_imb', clues).eq('tipo_registro', 'unidad').maybeSingle()
       ]);
       if (answersResult.error) throw answersResult.error;
-      unitAnswers = (answersResult.data || []).map(answerFromDatabase);
+      unitAnswers = (answersResult.data || []).flatMap(answersFromOffice);
       if (configResult.error) {
         console.warn('Unit configuration unavailable:', configResult.error.message);
       } else {
         general = configResult.data ? configFromDatabase(configResult.data) : null;
       }
       if (general) {
-        unitAnswers.forEach((answer) => {
-          if (answer.turno) general!.turns[answer.numeroConsultorio] = answer.turno;
+        (answersResult.data || []).forEach((office: any) => {
+          if (office.turno_consultorio) general!.turns[Number(office.consultorio)] = office.turno_consultorio;
         });
       }
 
@@ -376,8 +505,7 @@ app.delete('/api/unidades/:clues/respuestas/', async (req, res) => {
           .from('respuestas')
           .delete()
           .eq('clues_imb', clues)
-          .eq('tipo_registro', 'respuesta')
-          .neq('pregunta', 'consultorios')
+          .eq('tipo_registro', 'consultorio')
           .select('clues_imb');
         if (error) throw error;
         deletedCount = data?.length || 0;
@@ -502,13 +630,7 @@ app.post('/api/respuestas/', async (req, res) => {
     // Optional Supabase DB sync if configured
     const sb = getSupabase();
     if (sb) {
-      const row = answerToDatabase(storedAnswer);
-      const existing = await sb.from('respuestas').select('clues_imb').eq('clues_imb', normClues).eq('tipo_registro', 'respuesta').eq('consultorio', storedAnswer.numeroConsultorio).eq('pregunta', storedAnswer.pregunta).maybeSingle();
-      if (existing.error) throw existing.error;
-      const { error } = existing.data
-        ? await sb.from('respuestas').update(row).eq('clues_imb', normClues).eq('tipo_registro', 'respuesta').eq('consultorio', storedAnswer.numeroConsultorio).eq('pregunta', storedAnswer.pregunta)
-        : await sb.from('respuestas').insert(row);
-      if (error) throw error;
+      await persistStoredAnswer(sb, storedAnswer);
     }
 
     return res.status(201).json({
@@ -598,13 +720,7 @@ app.post('/api/sincronizar/', async (req, res) => {
 
         answersStore.set(key, stored);
         if (sb) {
-          const row = answerToDatabase(stored);
-          const existing = await sb.from('respuestas').select('clues_imb').eq('clues_imb', normClues).eq('tipo_registro', 'respuesta').eq('consultorio', stored.numeroConsultorio).eq('pregunta', stored.pregunta).maybeSingle();
-          if (existing.error) throw existing.error;
-          const { error } = existing.data
-            ? await sb.from('respuestas').update(row).eq('clues_imb', normClues).eq('tipo_registro', 'respuesta').eq('consultorio', stored.numeroConsultorio).eq('pregunta', stored.pregunta)
-            : await sb.from('respuestas').insert(row);
-          if (error) throw error;
+          await persistStoredAnswer(sb, stored);
         }
         syncedIds.push(item.id);
       } else if (item.action === 'save_general' && item.payload) {

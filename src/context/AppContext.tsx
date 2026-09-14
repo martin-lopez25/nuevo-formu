@@ -202,9 +202,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return;
       }
 
-      const queue = (await getPendingSyncQueue()).filter(
-        (item) => item.clues.trim().toUpperCase() === selectedUnit.clues.trim().toUpperCase()
-      );
+      const pendingQueue = await getPendingSyncQueue();
+      const queue = selectedUnit
+        ? pendingQueue.filter(
+            (item) => item.clues.trim().toUpperCase() === selectedUnit.clues.trim().toUpperCase()
+          )
+        : pendingQueue;
       if (queue.length === 0) {
         addToast('Sincronizado', 'success', 'Todos los datos están al día con la nube.');
         setIsSyncing(false);
