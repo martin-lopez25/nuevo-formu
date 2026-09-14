@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext.tsx';
-import { Wifi, AlertCircle, CheckCircle2, Sliders, ChevronDown, ListFilter } from 'lucide-react';
+import { Wifi, Sliders, ChevronDown, ChevronUp, ListFilter } from 'lucide-react';
 import { EQUIPMENT_CATALOG } from '../data/equipmentCatalog.ts';
 import { OFFICE_ENABLED_QUESTION } from '../data/officeConfiguration.ts';
 
@@ -20,9 +20,14 @@ export const GeneralQuestions: React.FC<GeneralQuestionsProps> = ({ onScrollToQu
 
   const [officeCountInput, setOfficeCountInput] = useState(generalData.configuredOffices === null ? '' : String(generalData.configuredOffices));
   const [isOfficeCountConfirmationPending, setIsOfficeCountConfirmationPending] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   useEffect(() => {
     setOfficeCountInput(generalData.configuredOffices === null ? '' : String(generalData.configuredOffices));
+  }, [generalData.configuredOffices]);
+
+  useEffect(() => {
+    if ((generalData.configuredOffices ?? 0) > 0) setIsCollapsed(true);
   }, [generalData.configuredOffices]);
 
   if (!selectedUnit) return null;
@@ -48,17 +53,53 @@ export const GeneralQuestions: React.FC<GeneralQuestionsProps> = ({ onScrollToQu
     }
     setIsOfficeCountConfirmationPending(false);
     handleConfigureOffices(Number(officeCountInput));
+    if (Number(officeCountInput) > 0) setIsCollapsed(true);
   };
+
+  if (isCollapsed) {
+    return (
+      <button
+        type="button"
+        onClick={() => setIsCollapsed(false)}
+        className="flex w-full items-center justify-between gap-3 rounded-lg border border-[#A57F2C]/40 bg-[#002F2A]/80 px-4 py-2 text-left text-white shadow-lg backdrop-blur-md transition-colors hover:bg-[#003b34]"
+        aria-expanded="false"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <Sliders className="h-4 w-4 shrink-0 text-[#A57F2C]" />
+          <span className="truncate text-xs font-bold uppercase">Características de la unidad médica</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-3 text-[11px] text-zinc-300">
+          <span>Consultorios: <strong className="text-amber-300">{generalData.configuredOffices}</strong></span>
+          <span>Progreso: <strong className="text-emerald-300">{stats.progressPercentage}%</strong></span>
+          <ChevronDown className="h-4 w-4 text-amber-300" />
+        </span>
+      </button>
+    );
+  }
 
   return (
     <div className="w-full space-y-4">
       {/* General Questions Panel */}
       <div className="rounded-3xl backdrop-blur-md bg-[#002F2A]/75 border border-white/25 p-4 sm:p-5 shadow-[0_25px_60px_rgba(0,0,0,0.5)] text-white space-y-4">
-        <div className="flex items-center gap-2 border-b border-white/20 pb-2.5">
-          <Sliders className="w-4 h-4 text-[#A57F2C]" />
-          <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-white drop-shadow-sm">
-            CARACTERÍSTICAS DE LA UNIDAD MÉDICA
-          </h3>
+        <div className="flex items-center justify-between gap-2 border-b border-white/20 pb-2.5">
+          <div className="flex items-center gap-2">
+            <Sliders className="w-4 h-4 text-[#A57F2C]" />
+            <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-white drop-shadow-sm">
+              CARACTERÍSTICAS DE LA UNIDAD MÉDICA
+            </h3>
+          </div>
+          {(generalData.configuredOffices ?? 0) > 0 && (
+            <button
+              type="button"
+              onClick={() => setIsCollapsed(true)}
+              className="flex h-7 w-7 items-center justify-center rounded-md border border-white/20 text-amber-200 hover:bg-white/10"
+              title="Minimizar características"
+              aria-label="Minimizar características de la unidad médica"
+              aria-expanded="true"
+            >
+              <ChevronUp className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-4">
@@ -106,7 +147,7 @@ export const GeneralQuestions: React.FC<GeneralQuestionsProps> = ({ onScrollToQu
               value={officeCountInput}
               onChange={(event) => {
                 const value = event.target.value;
-                if (value === '' || (/^\d+$/.test(value) && Number(value) <= 20)) {
+                if (value === '' || /^\d+$/.test(value)) {
                   setOfficeCountInput(value);
                   setIsOfficeCountConfirmationPending(false);
                 }

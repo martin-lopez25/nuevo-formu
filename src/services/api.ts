@@ -164,12 +164,11 @@ async function saveAnswerRow(payload: Parameters<typeof saveSingleAnswer>[0]) {
       : await client.from('respuestas').insert(row);
     if (result.error) throw result.error;
     if (payload.pregunta === OFFICE_ENABLED_QUESTION && !enabled) {
-      const disabledSchedules = await client.from('respuestas')
-        .update({ habilitado: false, medico_disponible: false, fecha_registro: timestamp })
-        .eq('clues_imb', normalizedClues)
-        .eq('tipo_registro', 'horario')
-        .eq('consultorio', payload.numeroConsultorio);
-      if (disabledSchedules.error) throw disabledSchedules.error;
+      const { error } = await client.rpc('eliminar_datos_consultorio_deshabilitado', {
+        p_clues: normalizedClues,
+        p_consultorio: payload.numeroConsultorio
+      });
+      if (error) throw error;
     }
     return timestamp;
   }

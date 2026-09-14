@@ -89,7 +89,7 @@ export const Section2Instructions: React.FC = () => {
                 Configurar Consultorios
               </h3>
               <p className="text-xs text-black leading-relaxed">
-                  Ingrese el número de consultorios que se capturarán para el informe SUS (de 0 a 20), presione "Aplicar" y después "Confirmar" para generar la matriz. Si confirma 0, la unidad se marcará como completada al 100% porque no existen equipos por capturar.
+                  Ingrese el número de consultorios que se capturarán para el informe SUS, presione "Aplicar" y después "Confirmar" para generar la matriz. Si confirma 0, la unidad se marcará como completada al 100% porque no existen equipos por capturar.
               </p>
             </div>
 

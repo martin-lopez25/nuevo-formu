@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext.tsx';
 import { Check, AlertCircle, Save, X } from 'lucide-react';
 import { TurnType } from '../types.ts';
-import { NumericStepper } from './NumericStepper.tsx';
 
 interface QuestionCellProps {
   officeNumber: number;
@@ -126,18 +125,30 @@ export const QuestionCell: React.FC<QuestionCellProps> = ({ officeNumber, questi
       ) : isEditing ? (
         <div className="min-w-[210px] bg-[#1E5B4F]/90 p-2 rounded-lg border border-amber-400 shadow-2xl z-20 relative">
           <div className="flex items-center justify-center gap-1">
-            <NumericStepper
-              inputRef={inputRef}
-              min="0"
+            <input
+              ref={inputRef}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={inputValue}
-              onChange={(value) => {
-                setInputValue(value);
-                setErrorMsg('');
-                setIsSaveConfirmationPending(false);
+              onChange={(event) => {
+                if (event.target.value === '' || /^\d+$/.test(event.target.value)) {
+                  setInputValue(event.target.value);
+                  setErrorMsg('');
+                  setIsSaveConfirmationPending(false);
+                }
               }}
-              onEnter={handleSave}
-              onEscape={handleCancelEdit}
-              inputClassName="w-10 px-1 py-1 text-xs font-bold text-white"
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  void handleSave();
+                } else if (event.key === 'Escape') {
+                  event.preventDefault();
+                  handleCancelEdit();
+                }
+              }}
+              aria-label={`Cantidad de ${question} en consultorio ${officeNumber}`}
+              className="h-8 w-20 rounded-md border border-white/25 bg-black/40 px-2 text-center text-xs font-bold text-white focus:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
             <button
               type="button"

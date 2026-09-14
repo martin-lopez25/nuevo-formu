@@ -1,4 +1,5 @@
 import { QuestionAnswer, SyncQueueItem, UnitGeneralData, UserRegistration, MedicalUnit } from '../types.ts';
+import { isDisabledOfficeAnswerQuestion } from '../data/officeConfiguration.ts';
 
 const DB_NAME = 'IMSS_Bienestar_Equipamiento_DB';
 const DB_VERSION = 1;
@@ -231,6 +232,44 @@ export async function deleteLocalTurnSchedules(
         && item.action === 'save_answer'
         && Number(item.payload?.numeroConsultorio) === officeNumber
         && matchesTurn(question)
+      ) {
+        cursor.delete();
+      }
+      cursor.continue();
+    }
+  };
+
+  await new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function deleteLocalEnabledOfficeData(clues: string, officeNumber: number): Promise<void> {
+  const normClues = clues.trim().toUpperCase();
+  const db = await getDB();
+  if (!db.transaction) return;
+
+  const tx = db.transaction(['answers', 'syncQueue'], 'readwrite');
+  tx.objectStore('answers').index('clues').openCursor(IDBKeyRange.only(normClues)).onsuccess = (event) => {
+    const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result;
+    if (cursor) {
+      const answer = cursor.value as QuestionAnswer;
+      if (answer.officeNumber === officeNumber && !isDisabledOfficeAnswerQuestion(answer.question)) cursor.delete();
+      cursor.continue();
+    }
+  };
+
+  tx.objectStore('syncQueue').openCursor().onsuccess = (event) => {
+    const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result;
+    if (cursor) {
+      const item = cursor.value as SyncQueueItem;
+      const question = String(item.payload?.pregunta || '');
+      if (
+        item.clues?.trim().toUpperCase() === normClues
+        && item.action === 'save_answer'
+        && Number(item.payload?.numeroConsultorio) === officeNumber
+        && !isDisabledOfficeAnswerQuestion(question)
       ) {
         cursor.delete();
       }

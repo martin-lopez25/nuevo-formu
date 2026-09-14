@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext.tsx';
 import { EQUIPMENT_CATALOG } from '../data/equipmentCatalog.ts';
 import { QuestionCell } from './QuestionCell.tsx';
@@ -12,9 +12,11 @@ interface QuestionnaireTableProps {
 
 export const QuestionnaireTable: React.FC<QuestionnaireTableProps> = ({ tableContainerRef }) => {
   const { generalData, answers } = useApp();
+  const [selectedOffice, setSelectedOffice] = useState(1);
 
   const officesCount = generalData.configuredOffices ?? 0;
   const officesList = Array.from({ length: officesCount }, (_, i) => i + 1);
+  const activeOffice = Math.min(selectedOffice, Math.max(1, officesCount));
 
   if (officesCount === 0) {
     return (
@@ -46,50 +48,60 @@ export const QuestionnaireTable: React.FC<QuestionnaireTableProps> = ({ tableCon
         </div>
       </div>
 
-      <div className="border-b border-amber-400/30 bg-amber-950/45 px-4 py-3 text-[11px] leading-relaxed text-amber-100">
-        <strong className="text-amber-300">Criterio de contabilización:</strong> únicamente se contabilizan los bienes cuya existencia se encuentre en condiciones óptimas de funcionamiento, a fin de que la cantidad reportada corresponda al equipamiento efectivamente disponible para la operación. Los bienes fuera de funcionamiento no deben incluirse, para evitar sobreestimar la disponibilidad y sesgar la determinación de las necesidades de adquisición.
+      <div className="flex flex-wrap gap-1.5 border-b border-white/15 bg-[#002F2A]/70 p-2" role="tablist" aria-label="Consultorios">
+        <p className="w-full text-[10px] font-bold text-amber-200">Seleccione el consultorio a llenar</p>
+        {officesList.map((officeNumber) => (
+          <button
+            key={officeNumber}
+            type="button"
+            role="tab"
+            aria-selected={activeOffice === officeNumber}
+            aria-controls={`office-panel-${officeNumber}`}
+            onClick={() => setSelectedOffice(officeNumber)}
+            className={`min-w-10 rounded-md border px-3 py-1.5 text-[10px] font-extrabold transition-colors ${
+              activeOffice === officeNumber
+                ? 'border-amber-200 bg-[#A57F2C] text-black'
+                : 'border-white/20 bg-black/20 text-zinc-200 hover:border-amber-300/60 hover:bg-white/10'
+            }`}
+          >
+            C{officeNumber}
+          </button>
+        ))}
       </div>
 
-      {/* Responsive Horizontal Scroll Container */}
+      {/* Vertical scroll container; tabs keep one office visible at a time. */}
       <div
         ref={tableContainerRef}
-        className="overflow-x-auto custom-scrollbar max-h-[65vh] relative"
+        id={`office-panel-${activeOffice}`}
+        role="tabpanel"
+        className="custom-scrollbar relative max-h-[65vh] overflow-x-hidden overflow-y-auto"
       >
-        <table className="w-full border-collapse text-left text-xs min-w-[650px]">
+        <table className="w-full table-fixed border-collapse text-left text-xs">
           {/* Header row: Column titles */}
           <thead className="sticky top-0 z-30 bg-[#1E5B4F]/85 backdrop-blur-md border-b border-[#A57F2C]/40 shadow-md">
             <tr>
-              <th className="sticky left-0 z-30 bg-[#1E5B4F]/90 backdrop-blur-md p-3 font-extrabold text-[#A57F2C] text-xs uppercase tracking-wider min-w-[200px] sm:min-w-[280px] border-r border-white/15">
+              <th className="sticky left-0 z-30 w-[42%] bg-[#1E5B4F]/90 backdrop-blur-md p-3 font-extrabold text-[#A57F2C] text-xs uppercase tracking-wider border-r border-white/15">
                 Pregunta / Equipo
               </th>
-              {officesList.map((cNum) => (
-                <th
-                  key={`th-${cNum}`}
-                  className="p-2 text-center font-bold text-white text-xs min-w-[350px] border-r border-white/15 last:border-r-0"
-                >
-                  Consultorio {cNum}
-                </th>
-              ))}
+              <th className="w-[58%] p-2 text-center text-xs font-bold text-white">
+                Consultorio {activeOffice}
+              </th>
             </tr>
+          </thead>
 
-            {/* Office configuration row */}
+          {/* Office configuration and equipment rows */}
+          <tbody className="divide-y divide-white/10">
             <tr className="bg-[#1E5B4F]/50 border-b border-white/15">
-              <td className="sticky left-0 z-30 bg-[#1E5B4F]/90 backdrop-blur-md p-2.5 font-bold text-amber-300 text-xs border-r border-white/15">
+              <td className="sticky left-0 z-20 bg-[#1E5B4F]/90 backdrop-blur-md p-2.5 font-bold text-amber-300 text-xs border-r border-white/15">
                 <div className="flex items-center gap-1.5">
                   <ClipboardList className="w-3.5 h-3.5 text-[#A57F2C]" />
                   <span>Configuración del consultorio</span>
                 </div>
               </td>
-              {officesList.map((cNum) => (
-                  <td key={`config-${cNum}`} className="p-1.5 align-top border-r border-white/15 last:border-r-0">
-                    <OfficeConfigurationPanel officeNumber={cNum} />
-                  </td>
-              ))}
+              <td className="p-1.5 align-top">
+                <OfficeConfigurationPanel officeNumber={activeOffice} />
+              </td>
             </tr>
-          </thead>
-
-          {/* Equipment Questions Rows */}
-          <tbody className="divide-y divide-white/10">
             {EQUIPMENT_CATALOG.map((item, idx) => {
               // Check if all offices in this row have saved answers
               let allAnsweredInRow = true;
@@ -132,15 +144,13 @@ export const QuestionnaireTable: React.FC<QuestionnaireTableProps> = ({ tableCon
                   </td>
 
                   {/* Office Cells */}
-                  {officesList.map((cNum) => (
-                    <QuestionCell
-                      key={`cell-${cNum}-${item.id}`}
-                      officeNumber={cNum}
-                      question={item.name}
-                      turn={generalData.turns[cNum] || ''}
-                      disabled={answers[`${cNum}__${OFFICE_ENABLED_QUESTION}`]?.value !== 1}
-                    />
-                  ))}
+                  <QuestionCell
+                    key={`cell-${activeOffice}-${item.id}`}
+                    officeNumber={activeOffice}
+                    question={item.name}
+                    turn={generalData.turns[activeOffice] || ''}
+                    disabled={answers[`${activeOffice}__${OFFICE_ENABLED_QUESTION}`]?.value !== 1}
+                  />
                 </tr>
               );
             })}

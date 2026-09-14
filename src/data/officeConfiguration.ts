@@ -49,6 +49,12 @@ export function getDisabledCauseFromQuestion(question: string) {
   return DISABLED_OFFICE_CAUSES.find((cause) => cause.question === question);
 }
 
+export function isDisabledOfficeAnswerQuestion(question: string) {
+  return question === OFFICE_ENABLED_QUESTION
+    || question === DISABLED_CAUSE_CONFIRMATION_QUESTION
+    || Boolean(getDisabledCauseFromQuestion(question));
+}
+
 export function parseOfficeScheduleQuestion(question: string) {
   const match = question.match(/^¿Opera en este horario\? (Matutino|Vespertino) - (.+)$/);
   return match ? { turn: match[1] as OperationalTurn, day: match[2] } : null;

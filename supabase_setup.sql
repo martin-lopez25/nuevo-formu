@@ -12,7 +12,7 @@ create table if not exists public.respuestas (
   consultorios_habilitados integer check (consultorios_habilitados >= 0),
   consultorios_inhabilitados integer check (consultorios_inhabilitados >= 0),
   total_consultorios_medicina_general integer check (total_consultorios_medicina_general >= 0),
-  consultorios integer check (consultorios between 0 and 20),
+  consultorios integer check (consultorios >= 0),
   consultorio integer,
   pregunta text,
   valor integer check (valor is null or valor >= 0),
@@ -30,13 +30,19 @@ alter table public.respuestas
   add column if not exists total_consultorios_medicina_general integer
     check (total_consultorios_medicina_general >= 0),
   add column if not exists consultorios integer
-    check (consultorios between 0 and 20),
+    check (consultorios >= 0),
   add column if not exists habilitado boolean,
   add column if not exists causas_inhabilitacion text not null default '',
   add column if not exists medicos_generales integer
     check (medicos_generales is null or medicos_generales >= 0),
   add column if not exists medico_disponible boolean,
   add column if not exists horarios jsonb not null default '{}'::jsonb;
+
+alter table public.respuestas
+  drop constraint if exists respuestas_consultorios_check;
+
+alter table public.respuestas
+  add constraint respuestas_consultorios_check check (consultorios >= 0);
 
 do $migration$
 begin
@@ -246,6 +252,37 @@ $$;
 
 revoke all on function public.eliminar_horarios_turno(text, integer, text) from public, authenticated;
 grant execute on function public.eliminar_horarios_turno(text, integer, text) to anon, service_role;
+
+create or replace function public.eliminar_datos_consultorio_deshabilitado(
+  p_clues text,
+  p_consultorio integer
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  filas_eliminadas integer;
+begin
+  if nullif(trim(p_clues), '') is null or p_consultorio <= 0 then
+    raise exception 'Parámetros de consultorio inválidos';
+  end if;
+
+  perform set_config('app.permitir_borrado_respuestas', 'on', true);
+
+  delete from public.respuestas
+  where clues_imb = upper(trim(p_clues))
+    and consultorio = p_consultorio
+    and tipo_registro in ('respuesta', 'horario');
+
+  get diagnostics filas_eliminadas = row_count;
+  return filas_eliminadas;
+end;
+$$;
+
+revoke all on function public.eliminar_datos_consultorio_deshabilitado(text, integer) from public, authenticated;
+grant execute on function public.eliminar_datos_consultorio_deshabilitado(text, integer) to anon, service_role;
 
 alter table public.respuestas enable row level security;
 

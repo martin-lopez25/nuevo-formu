@@ -12,21 +12,16 @@ import {
   Info,
   MapPin,
   RefreshCw,
-  Eye,
   AlertTriangle
 } from 'lucide-react';
 
-interface UnitSelectorProps {
-  onUnlockRequest: () => void;
-  onOpenDetails: () => void;
-}
-
-export const UnitSelector: React.FC<UnitSelectorProps> = ({ onUnlockRequest, onOpenDetails }) => {
+export const UnitSelector: React.FC = () => {
   const {
     selectedEntity,
     selectedUnit,
     isUnitLocked,
     handleSelectUnit,
+    handleUnlockUnit,
     pendingSyncCount
   } = useApp();
 
@@ -81,6 +76,10 @@ export const UnitSelector: React.FC<UnitSelectorProps> = ({ onUnlockRequest, onO
     await handleSelectUnit(u);
   };
 
+  if (isUnitLocked && selectedUnit) {
+    return null;
+  }
+
   return (
     <div id="unit-selector" className="w-full scroll-mt-4 rounded-3xl backdrop-blur-md bg-[#002F2A]/75 border border-white/25 p-4 sm:p-5 shadow-[0_25px_60px_rgba(0,0,0,0.5)] text-white">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/20 pb-3 mb-3">
@@ -101,18 +100,9 @@ export const UnitSelector: React.FC<UnitSelectorProps> = ({ onUnlockRequest, onO
         {/* Action Controls when unit is selected */}
         {selectedUnit && (
           <div className="flex items-center gap-2">
-            <button
-              onClick={onOpenDetails}
-              className="px-3 py-1.5 rounded-full bg-transparent hover:bg-white/10 border border-white/25 text-xs font-semibold text-zinc-100 transition-colors flex items-center gap-1.5 backdrop-blur-sm"
-              id="btn-ver-detalles"
-            >
-              <Eye className="w-3.5 h-3.5 text-[#A57F2C]" />
-              <span>VER DETALLES</span>
-            </button>
-
             {isUnitLocked ? (
               <button
-                onClick={onUnlockRequest}
+                onClick={handleUnlockUnit}
                 className="px-3.5 py-1.5 rounded-full bg-[#611232]/90 hover:bg-[#7b173f] border border-[#9B2247] text-xs font-bold text-white transition-colors flex items-center gap-1.5 shadow-md backdrop-blur-sm"
                 id="btn-desbloquear-unidad"
                 title="Cambiar de unidad médica"

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { useApp } from '../context/AppContext.tsx';
+import { FormEntryLoadingOverlay } from './LoadingOverlay.tsx';
 import {
   Sparkles,
   HelpCircle,
@@ -13,11 +14,19 @@ import {
 
 export const Section2InstructionsVisuals: React.FC = () => {
   const { setActiveSection, resetQuestionnaireState } = useApp();
+  const [isEnteringForm, setIsEnteringForm] = useState(false);
 
-  const handleEnterForm = () => {
+  const handleEnterForm = async () => {
+    if (isEnteringForm) return;
+    setIsEnteringForm(true);
+    await new Promise((resolve) => setTimeout(resolve, 3000));
     resetQuestionnaireState();
     setActiveSection('formulario');
   };
+
+  if (isEnteringForm) {
+    return <FormEntryLoadingOverlay />;
+  }
 
   return (
     <div className="relative min-h-[calc(100vh-64px)] w-full flex items-center justify-center p-3 sm:p-6 lg:p-10 overflow-hidden">

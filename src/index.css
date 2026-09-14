@@ -1,5 +1,287 @@
 @import "tailwindcss";
 
+@keyframes completion-heartbeat {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: 1050; }
+}
+
+@keyframes completion-dots {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75%, 100% { content: '...'; }
+}
+
+.completion-heartbeat-path {
+  stroke-dasharray: 150 200;
+  animation: completion-heartbeat 3s linear infinite;
+}
+
+.completion-loading-dots::after {
+  content: '';
+  animation: completion-dots 1s steps(1, end) infinite;
+}
+
+@keyframes form-entry-rotate {
+  100% { left: -100%; }
+}
+
+@keyframes form-entry-shake {
+  20% { transform: translate(-50%, -50%) rotate(-5deg); }
+  50% { transform: translate(-50%, -50%) rotate(7deg); }
+  65% { transform: translate(-50%, -50%) rotate(-2deg); }
+  80% { transform: translate(-50%, -50%) rotate(5deg); }
+}
+
+@keyframes form-entry-cap-shadow {
+  20% { width: 35px; }
+  50% { width: 20px; }
+  78% { width: 33px; }
+}
+
+.form-entry-drawing {
+  position: relative;
+  width: 300px;
+  height: 330px;
+}
+
+.form-entry-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 150px;
+  height: 250px;
+  transform: translate(-50%, -50%);
+  animation: form-entry-shake 2s ease-in-out infinite;
+}
+
+.form-entry-bottle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 90px;
+  height: 150px;
+  overflow: hidden;
+  transform: translate(-50%, -50%);
+  border-radius: 0 0 10px 10px;
+  background: #ffea6a;
+}
+
+.form-entry-cap {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  width: 120px;
+  height: 40px;
+  transform: translate(-50%, -50%);
+  border-radius: 5px;
+  background: #faf4f1;
+}
+
+.form-entry-cap-shadow {
+  position: absolute;
+  right: 1.5%;
+  width: 30px;
+  height: 40px;
+  border-radius: 0 5px 5px 0;
+  background: #eae0db;
+  animation: form-entry-cap-shadow 2s ease-in-out infinite;
+}
+
+.form-entry-bottle-shadow {
+  position: absolute;
+  top: 21%;
+  right: 21%;
+  width: 5px;
+  height: 142px;
+  background: rgb(227 206 82 / 50%);
+}
+
+.form-entry-bottle-shadow::before {
+  position: absolute;
+  top: -2px;
+  left: -80px;
+  width: 85px;
+  height: 8px;
+  background: #e3ce52;
+  clip-path: polygon(100% 0, 0 0, 100% 100%);
+  content: '';
+}
+
+.form-entry-prescription {
+  position: absolute;
+  top: 50%;
+  left: 150%;
+  width: 60px;
+  height: 70px;
+  transform: translate(-50%, -50%);
+  background: #faf4f1;
+  animation: form-entry-rotate 1s linear infinite;
+}
+
+.form-entry-logo {
+  position: absolute;
+  top: 19%;
+  left: 10%;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #62aec1;
+}
+
+.form-entry-label {
+  position: absolute;
+  top: 23%;
+  left: 45%;
+  width: 28px;
+  height: 8px;
+  background: #eb4040;
+}
+
+.form-entry-paragraphs span {
+  position: absolute;
+  height: 3px;
+  background: #d8d8d8;
+}
+
+.form-entry-paragraphs span:nth-child(1) {
+  top: 38px;
+  left: 20px;
+  width: 39px;
+}
+
+.form-entry-paragraphs span:nth-child(2) {
+  top: 44px;
+  left: 10px;
+  width: 49px;
+}
+
+.form-entry-paragraphs span:nth-child(3) {
+  top: 50px;
+  left: 10px;
+  width: 49px;
+}
+
+.form-entry-paragraphs span:nth-child(4) {
+  top: 56px;
+  left: 10px;
+  width: 49px;
+}
+
+.form-entry-ground-shadow {
+  position: absolute;
+  top: 75%;
+  left: 50%;
+  width: 120px;
+  height: 5px;
+  margin-top: 40px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #74abb9;
+}
+
+.medical-cabinet {
+  position: relative;
+  width: 34px;
+  height: 54px;
+  border: 1px solid #808080;
+  outline: 1px solid #ddd;
+  cursor: pointer;
+  perspective: 500px;
+  transform-style: preserve-3d;
+}
+
+.medical-cabinet-front {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  transform-origin: left;
+  outline: 1px solid #ddd;
+  background: #ddd;
+  box-shadow: 6px 0 10px rgb(0 0 0 / 20%);
+  transition: transform 0.8s ease;
+}
+
+.medical-cabinet-front::before {
+  position: absolute;
+  top: 6px;
+  left: 13px;
+  z-index: 1;
+  width: 8px;
+  height: 22px;
+  background: #c62828;
+  content: '';
+  transition: opacity 0.35s ease;
+}
+
+.medical-cabinet-front::after {
+  position: absolute;
+  bottom: 32px;
+  left: 6px;
+  width: 22px;
+  height: 8px;
+  border: 1px solid #ddd;
+  background: #c62828;
+  content: '';
+  transition: opacity 0.35s ease;
+}
+
+.medical-cabinet-back {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  background: #ddd;
+  box-shadow: inset 0 0 8px rgb(0 0 0 / 22%);
+}
+
+.medical-cabinet-shelf {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: white;
+  box-shadow: 0 0 8px rgb(0 0 0 / 25%);
+}
+
+.medical-cabinet-upper { top: 25%; }
+.medical-cabinet-mid { top: 60%; }
+.medical-cabinet-lower { top: 94%; }
+
+.medical-cabinet-knob {
+  position: absolute;
+  top: 34px;
+  left: 26px;
+  z-index: 2;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  outline: 1px outset #f59e0b;
+  background: #f59e0b;
+  box-shadow: 0 0 8px rgb(0 0 0 / 50%);
+  transition: opacity 0.35s ease;
+}
+
+.medical-cabinet.is-open .medical-cabinet-front {
+  transform: rotateY(-155deg);
+}
+
+.medical-cabinet.is-open .medical-cabinet-front::before,
+.medical-cabinet.is-open .medical-cabinet-front::after,
+.medical-cabinet.is-open .medical-cabinet-knob {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .medical-cabinet-front,
+  .medical-cabinet-front::before,
+  .medical-cabinet-front::after,
+  .medical-cabinet-knob {
+    transition: none;
+  }
+}
+
 @layer utilities {
   /* Custom sleek scrollbar for table and drawers */
   .custom-scrollbar::-webkit-scrollbar {

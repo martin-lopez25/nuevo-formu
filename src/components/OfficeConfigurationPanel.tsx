@@ -113,7 +113,7 @@ export const OfficeConfigurationPanel: React.FC<OfficeConfigurationPanelProps> =
   };
 
   return (
-    <div className="min-w-[330px] space-y-2 rounded-md border border-white/15 bg-black/20 p-2 text-left">
+    <div className="w-full min-w-0 space-y-2 rounded-md border border-white/15 bg-black/20 p-2 text-left">
       <div className="flex items-center justify-between gap-2 rounded-md border border-white/15 bg-[#002F2A]/70 px-2 py-1">
         <p className="text-[10px] font-bold text-white">¿Está habilitado?</p>
         <div className="flex gap-1">
@@ -216,7 +216,7 @@ export const OfficeConfigurationPanel: React.FC<OfficeConfigurationPanelProps> =
       {isEnabled && <div className="flex items-center gap-2">
         <label htmlFor={`doctor-count-${officeNumber}`} className="flex min-w-0 flex-1 items-center gap-1 text-[9px] font-bold text-emerald-100">
           <Stethoscope className="h-3 w-3 shrink-0 text-emerald-400" />
-          <span>Médicos generales</span>
+          <span>¿Con cuántos médicos generales cuenta el consultorio?</span>
         </label>
         <div className="flex gap-1">
           <input

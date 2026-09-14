@@ -37,8 +37,6 @@ const MainAppContent: React.FC = () => {
     user,
     selectedUnit,
     isUnitLocked,
-    handleUnlockUnit,
-    setIsDetailsModalOpen,
     resetQuestionnaireState,
     handleChangeEntity
   } = useApp();
@@ -136,7 +134,7 @@ const MainAppContent: React.FC = () => {
                 <Section3EntitySelector onEntitySelected={handleEntityChosen} />
               ) : (
                 /* Entity is selected: Show Form Workflow */
-                <div className="space-y-5">
+                <div className="space-y-3">
                   {/* Top Bar: Active Entity & Capturista Info Card (Transparent Glass) */}
                   <div className="rounded-3xl backdrop-blur-md bg-[#002F2A]/75 border border-white/25 p-4 sm:p-5 shadow-[0_25px_60px_rgba(0,0,0,0.5)] flex flex-wrap items-center justify-between gap-3 text-white">
                     <div className="flex items-center gap-3">
@@ -195,10 +193,7 @@ const MainAppContent: React.FC = () => {
                   </div>
 
                   {/* Unit Selector Component */}
-                  <UnitSelector
-                    onUnlockRequest={handleUnlockUnit}
-                    onOpenDetails={() => setIsDetailsModalOpen(true)}
-                  />
+                  <UnitSelector />
 
                   {/* If Unit is Selected & Locked: Show General Questions & Dynamic Questionnaire Table */}
                   {selectedUnit && isUnitLocked && (
@@ -206,7 +201,7 @@ const MainAppContent: React.FC = () => {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.4 }}
-                      className="space-y-5"
+                      className="space-y-3"
                     >
                       {/* General Questions & Office Configurator */}
                       <GeneralQuestions onScrollToQuestion={handleScrollToQuestion} />

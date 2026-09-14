@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { useApp } from '../context/AppContext.tsx';
-import { Wifi, WifiOff, RefreshCw, Building2, Home } from 'lucide-react';
+import { WifiOff, RefreshCw, Building2, Home, Lock } from 'lucide-react';
+import { FillingInstructionsCabinet } from './FillingInstructionsCabinet.tsx';
 
 interface NavbarProps {
   onSecretAccess: () => void;
@@ -17,6 +18,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onSecretAccess }) => {
     pendingSyncCount,
     triggerManualSync,
     selectedUnit,
+    handleUnlockUnit,
   } = useApp();
 
   const handleLogoClick = () => {
@@ -68,16 +70,29 @@ export const Navbar: React.FC<NavbarProps> = ({ onSecretAccess }) => {
               draggable={false}
             />
           </button>
+
+          {selectedUnit && activeSection === 'formulario' && <FillingInstructionsCabinet />}
         </div>
 
         {/* Right: Connection & Status Indicators */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Active Unit Badge if inside questionnaire */}
           {selectedUnit && activeSection === 'formulario' && (
-            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#611232]/70 border border-[#9B2247]/50 text-xs backdrop-blur-md">
-              <Building2 className="w-3.5 h-3.5 text-[#A57F2C]" />
-              <span className="font-mono text-amber-200 font-semibold">{selectedUnit.clues}</span>
-              <span className="text-zinc-200 text-[11px] truncate max-w-[140px]">{selectedUnit.name}</span>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <div className="hidden min-w-0 items-center gap-1.5 rounded-full border border-[#9B2247]/50 bg-[#611232]/70 px-3 py-1 text-xs backdrop-blur-md sm:flex">
+                <Building2 className="h-3.5 w-3.5 shrink-0 text-[#A57F2C]" />
+                <span className="shrink-0 font-mono font-semibold text-amber-200">{selectedUnit.clues}</span>
+                <span className="max-w-[140px] truncate text-[11px] text-zinc-200">{selectedUnit.name}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleUnlockUnit}
+                className="flex h-7 shrink-0 items-center gap-1 rounded-full border border-[#9B2247] bg-[#611232]/90 px-2 text-[9px] font-bold text-white hover:bg-[#7b173f]"
+                title="Cambiar de unidad médica"
+              >
+                <Lock className="h-3.5 w-3.5 text-amber-300" />
+                <span className="hidden md:inline">CAMBIAR UNIDAD</span>
+              </button>
             </div>
           )}
 

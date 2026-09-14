@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   MexicanEntity,
   MedicalUnit,
@@ -21,7 +21,8 @@ import {
   getAppDraft,
   makeAnswerKey,
   deleteLocalAnswersForUnit,
-  deleteLocalTurnSchedules
+  deleteLocalTurnSchedules,
+  deleteLocalEnabledOfficeData
 } from '../services/db.ts';
 import {
   checkServerHealth,
@@ -37,6 +38,7 @@ import {
   DISABLED_CAUSE_CONFIRMATION_QUESTION,
   getRequiredOfficeConfigurationQuestions,
   isDoctorAvailabilityQuestion,
+  isDisabledOfficeAnswerQuestion,
   isOfficeScheduleQuestion,
   OFFICE_ENABLED_QUESTION,
   TURN_SELECTION_QUESTION,
@@ -95,6 +97,7 @@ interface AppContextType {
   ) => Promise<void>;
   handleSetTurn: (officeNumber: number, turn: TurnType) => Promise<void>;
   handleSaveAnswer: (officeNumber: number, question: string, value: number, silentSuccess?: boolean) => Promise<void>;
+  confirmCompletedUnit: (onSaved?: () => void) => Promise<boolean>;
   setEditingCell: (key: string | null) => void;
   addToast: (title: string, type?: ToastMessage['type'], description?: string) => void;
   removeToast: (id: string) => void;
@@ -169,17 +172,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isZeroOfficesModalOpen, setIsZeroOfficesModalOpen] = useState<boolean>(false);
   const [completedUnitName, setCompletedUnitName] = useState<string | null>(null);
   const [conflictData, setConflictData] = useState<ConflictData | null>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const addToast = useCallback((title: string, type: ToastMessage['type'] = 'info', description?: string) => {
-    const id = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-    setToasts((prev) => [...prev, { id, title, type, description, duration: 4000 }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
+    const id = 'current-notification';
+    setToasts([{ id, title, type, description, duration: 4000 }]);
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => {
+      setToasts([]);
+      toastTimeoutRef.current = null;
     }, 4500);
   }, []);
 
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+      toastTimeoutRef.current = null;
+    }
   }, []);
 
   // Check pending sync queue count
@@ -451,25 +461,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const finishCompletedUnit = useCallback((unitName: string) => {
     setCompletedUnitName(unitName);
-    setIsUnitLocked(false);
-    setSelectedUnit(null);
-    setAnswers({});
-    setGeneralData(defaultGeneralData);
-    saveAppDraft('current_session', {
-      selectedEntity,
-      user,
-      selectedUnit: null,
-      isUnitLocked: false
-    });
-    addToast('Unidad completada', 'success', `${unitName}. Seleccione la siguiente unidad médica.`);
-    setTimeout(() => {
-      document.getElementById('unit-selector')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
-  }, [selectedEntity, user, addToast]);
+  }, []);
+
+  const confirmCompletedUnit = useCallback(async (onSaved?: () => void) => {
+    if (!selectedUnit) return false;
+    try {
+      const isLive = await checkServerHealth();
+      if (!isLive) throw new Error('Sin conexión con Supabase');
+
+      const queue = await getPendingSyncQueue();
+      if (queue.length > 0) {
+        const result = await syncBatchQueue(queue);
+        if (!result.success || !result.data?.syncedIds) {
+          throw new Error(result.message || 'No fue posible sincronizar los cambios pendientes');
+        }
+        for (const syncedId of result.data.syncedIds) await removeSyncQueueItem(syncedId);
+      }
+
+      await saveUnitGeneral(selectedUnit.clues, generalData);
+  onSaved?.();
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      const unitName = selectedUnit.name;
+      setCompletedUnitName(null);
+      setIsUnitLocked(false);
+      setSelectedUnit(null);
+      setAnswers({});
+      setGeneralData(defaultGeneralData);
+      await saveAppDraft('current_session', {
+        selectedEntity,
+        user,
+        selectedUnit: null,
+        isUnitLocked: false
+      });
+      await refreshPendingCount();
+      addToast('Expediente guardado', 'success', `${unitName}. Seleccione la siguiente unidad médica.`);
+      setTimeout(() => {
+        document.getElementById('unit-selector')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+      return true;
+    } catch (error) {
+      console.error('Completed unit confirmation failed:', error);
+      addToast('No fue posible guardar el expediente', 'error', 'Revise la conexión e intente nuevamente. La captura permanece abierta.');
+      return false;
+    }
+  }, [selectedUnit, generalData, selectedEntity, user, refreshPendingCount, addToast]);
 
   // Office configuration
   const handleConfigureOffices = useCallback((count: number) => {
-    const safeCount = Math.max(0, Math.min(20, Math.floor(count)));
+    const safeCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
     if (safeCount === 0 && Object.keys(answers).length > 0) {
       setIsZeroOfficesModalOpen(true);
       return;
@@ -678,6 +717,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const cellKey = `${officeNumber}__${question}`;
     const previous = answers[cellKey];
     const wasComplete = isQuestionnaireComplete(generalData, answers);
+    const isDisablingOffice = question === OFFICE_ENABLED_QUESTION && value === 0;
 
     // Optimistic local update
     const newAnswer: QuestionAnswer = {
@@ -686,14 +726,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       question,
       value,
       status: 'saving',
-      turn: generalData.turns[officeNumber] || '',
+      turn: isDisablingOffice ? '' : generalData.turns[officeNumber] || '',
       updatedAt: new Date().toISOString(),
       version: (previous?.version || 0) + 1
     };
-    const nextAnswers = { ...answers, [cellKey]: newAnswer };
-    const completesUnit = !wasComplete && isQuestionnaireComplete(generalData, nextAnswers);
+    const nextAnswers = Object.fromEntries(
+      (Object.entries({ ...answers, [cellKey]: newAnswer }) as Array<[string, QuestionAnswer]>).filter(([, answer]) =>
+        !isDisablingOffice
+        || answer.officeNumber !== officeNumber
+        || isDisabledOfficeAnswerQuestion(answer.question)
+      )
+    ) as Record<string, QuestionAnswer>;
+    const nextGeneralData = isDisablingOffice
+      ? {
+          ...generalData,
+          turns: Object.fromEntries(Object.entries(generalData.turns).filter(([key]) => Number(key) !== officeNumber)),
+          updatedAt: new Date().toISOString()
+        }
+      : generalData;
+    const completesUnit = !wasComplete && isQuestionnaireComplete(nextGeneralData, nextAnswers);
 
-    setAnswers((prev) => ({ ...prev, [cellKey]: newAnswer }));
+    setAnswers(nextAnswers);
+    if (isDisablingOffice) {
+      setGeneralData(nextGeneralData);
+      await Promise.all([
+        deleteLocalEnabledOfficeData(selectedUnit.clues, officeNumber),
+        saveLocalGeneralData(nextGeneralData)
+      ]);
+    }
     await saveLocalAnswer(newAnswer);
     setEditingCellKey(null);
 
@@ -708,7 +768,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       numeroConsultorio: officeNumber,
       pregunta: question,
       valor: value,
-      turno: generalData.turns[officeNumber] || '',
+      turno: nextGeneralData.turns[officeNumber] || '',
       version: newAnswer.version
     };
 
@@ -881,6 +941,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         handleSetGeneralOfficeAvailability,
         handleSetTurn,
         handleSaveAnswer,
+        confirmCompletedUnit,
         setEditingCell,
         addToast,
         removeToast,
