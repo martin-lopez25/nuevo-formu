@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Building2, CheckCircle2, LoaderCircle, Save } from 'lucide-react';
+import { ArrowLeft, Building2, CheckCircle2, LoaderCircle, Save } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
 import { LoadingOverlay } from './LoadingOverlay.tsx';
 import { EQUIPMENT_CATALOG } from '../data/equipmentCatalog.ts';
@@ -22,6 +22,7 @@ export const CompletedUnitModal: React.FC = () => {
     answers,
     stats,
     user,
+    setCompletedUnitName,
     confirmCompletedUnit
   } = useApp();
   const [phase, setPhase] = useState<'review' | 'saving' | 'transition'>('review');
@@ -78,9 +79,6 @@ export const CompletedUnitModal: React.FC = () => {
             <div className="col-span-2"><span className="block text-[9px] font-bold uppercase text-zinc-400">Nombre de Unidad</span><strong>{selectedUnit.name}</strong></div>
             <div><span className="block text-[9px] font-bold uppercase text-zinc-400">Servicio de Internet</span><strong>{generalData.hasInternet}</strong></div>
             <div><span className="block text-[9px] font-bold uppercase text-zinc-400">Consultorios Configurados</span><strong>{displayValue(generalData.configuredOffices)}</strong></div>
-            <div><span className="block text-[9px] font-bold uppercase text-zinc-400">Consultorios Habilitados</span><strong>{displayValue(generalData.enabledOffices)}</strong></div>
-            <div><span className="block text-[9px] font-bold uppercase text-zinc-400">Temporalmente Inhabilitados</span><strong>{displayValue(generalData.unoperatedOffices)}</strong></div>
-            <div><span className="block text-[9px] font-bold uppercase text-zinc-400">Total Medicina General</span><strong>{displayValue(generalData.totalGeneralOffices)}</strong></div>
             <div><span className="block text-[9px] font-bold uppercase text-zinc-400">Progreso de Captura</span><strong className="text-emerald-300">{stats.progressPercentage}% completado</strong></div>
             <div><span className="block text-[9px] font-bold uppercase text-zinc-400">Campos Capturados</span><strong>{stats.answeredCount} de {stats.totalQuestions}</strong></div>
             <div className="col-span-2"><span className="block text-[9px] font-bold uppercase text-zinc-400">Capturista Registrado</span><strong>{user ? `${user.name} (${user.email})` : 'Sin registro'}</strong></div>
@@ -138,17 +136,28 @@ export const CompletedUnitModal: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t border-white/15 bg-black/20 px-4 py-3 sm:px-6">
+        <div className="flex flex-col gap-3 border-t border-white/15 bg-black/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p className="text-[10px] text-zinc-300">Revise el expediente antes de confirmar. La unidad permanecerá abierta si el guardado falla.</p>
-          <button
-            type="button"
-            onClick={() => void handleConfirm()}
-            disabled={phase === 'saving'}
-            className="flex shrink-0 items-center gap-2 rounded-md bg-[#A57F2C] px-4 py-2 text-xs font-extrabold text-black hover:bg-[#b88f33] disabled:cursor-wait disabled:opacity-60"
-          >
-            {phase === 'saving' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {phase === 'saving' ? 'GUARDANDO...' : 'ACEPTAR Y GUARDAR'}
-          </button>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setCompletedUnitName(null)}
+              disabled={phase === 'saving'}
+              className="flex shrink-0 items-center gap-2 rounded-md border border-white/25 bg-white/10 px-4 py-2 text-xs font-extrabold text-white hover:bg-white/20 disabled:cursor-wait disabled:opacity-60"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              REGRESAR AL FORMULARIO
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleConfirm()}
+              disabled={phase === 'saving'}
+              className="flex shrink-0 items-center gap-2 rounded-md bg-[#A57F2C] px-4 py-2 text-xs font-extrabold text-black hover:bg-[#b88f33] disabled:cursor-wait disabled:opacity-60"
+            >
+              {phase === 'saving' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {phase === 'saving' ? 'GUARDANDO...' : 'ACEPTAR Y GUARDAR'}
+            </button>
+          </div>
         </div>
       </motion.div>
     </motion.div>

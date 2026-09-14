@@ -747,7 +747,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       : generalData;
     const completesUnit = !wasComplete && isQuestionnaireComplete(nextGeneralData, nextAnswers);
 
-    setAnswers(nextAnswers);
+    setAnswers((currentAnswers) => Object.fromEntries(
+      (Object.entries({ ...currentAnswers, [cellKey]: newAnswer }) as Array<[string, QuestionAnswer]>).filter(([, answer]) =>
+        !isDisablingOffice
+        || answer.officeNumber !== officeNumber
+        || isDisabledOfficeAnswerQuestion(answer.question)
+      )
+    ) as Record<string, QuestionAnswer>);
     if (isDisablingOffice) {
       setGeneralData(nextGeneralData);
       await Promise.all([

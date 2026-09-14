@@ -37,6 +37,7 @@ export const OfficeConfigurationPanel: React.FC<OfficeConfigurationPanelProps> =
   const [pendingTurn, setPendingTurn] = useState<TurnType | null>(null);
   const [turnsToDelete, setTurnsToDelete] = useState<OperationalTurn[]>([]);
   const [disabledCauses, setDisabledCauses] = useState<string[]>([]);
+  const [isSavingCauses, setIsSavingCauses] = useState(false);
   const causesConfirmed = answers[`${officeNumber}__${DISABLED_CAUSE_CONFIRMATION_QUESTION}`]?.value === 1;
   const savedDisabledCauses = DISABLED_OFFICE_CAUSES
     .filter((cause) => answers[`${officeNumber}__${cause.question}`]?.value === 1)
@@ -51,8 +52,8 @@ export const OfficeConfigurationPanel: React.FC<OfficeConfigurationPanelProps> =
   }, [savedCount]);
 
   useEffect(() => {
-    setDisabledCauses(savedDisabledCauses);
-  }, [answers, officeNumber]);
+    if (!isSavingCauses) setDisabledCauses(savedDisabledCauses);
+  }, [answers, officeNumber, isSavingCauses]);
 
   const saveDoctorCount = async () => {
     if (doctorCount === '') return;
@@ -99,17 +100,22 @@ export const OfficeConfigurationPanel: React.FC<OfficeConfigurationPanelProps> =
   };
 
   const saveDisabledCauses = async () => {
-    if (disabledCauses.length === 0) return;
-    await handleSaveAnswer(officeNumber, DISABLED_CAUSE_CONFIRMATION_QUESTION, 0, true);
-    for (const cause of DISABLED_OFFICE_CAUSES) {
-      await handleSaveAnswer(
-        officeNumber,
-        cause.question,
-        disabledCauses.includes(cause.key) ? 1 : 0,
-        true
-      );
+    if (disabledCauses.length === 0 || isSavingCauses) return;
+    setIsSavingCauses(true);
+    try {
+      await handleSaveAnswer(officeNumber, DISABLED_CAUSE_CONFIRMATION_QUESTION, 0, true);
+      for (const cause of DISABLED_OFFICE_CAUSES) {
+        await handleSaveAnswer(
+          officeNumber,
+          cause.question,
+          disabledCauses.includes(cause.key) ? 1 : 0,
+          true
+        );
+      }
+      await handleSaveAnswer(officeNumber, DISABLED_CAUSE_CONFIRMATION_QUESTION, 1, true);
+    } finally {
+      setIsSavingCauses(false);
     }
-    await handleSaveAnswer(officeNumber, DISABLED_CAUSE_CONFIRMATION_QUESTION, 1, true);
   };
 
   return (
@@ -183,11 +189,11 @@ export const OfficeConfigurationPanel: React.FC<OfficeConfigurationPanelProps> =
           <button
             type="button"
             onClick={saveDisabledCauses}
-            disabled={disabledCauses.length === 0}
+            disabled={disabledCauses.length === 0 || isSavingCauses}
             className="flex w-full items-center justify-center gap-1 rounded-md bg-[#A57F2C] px-2 py-1 text-[8px] font-extrabold text-black transition-colors hover:bg-[#b88f33] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {causesAreSaved ? <Check className="h-3 w-3" /> : <Save className="h-3 w-3" />}
-            {causesAreSaved ? 'CAUSAS GUARDADAS' : 'GUARDAR CAUSAS'}
+            {isSavingCauses ? 'GUARDANDO CAUSAS...' : causesAreSaved ? 'CAUSAS GUARDADAS' : 'GUARDAR CAUSAS'}
           </button>
         </div>
       )}
